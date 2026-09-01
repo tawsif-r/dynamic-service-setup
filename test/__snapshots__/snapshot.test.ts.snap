@@ -1,0 +1,383 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for a Next.js + Mongo stack > Dockerfile 1`] = `
+"# syntax=docker/dockerfile:1
+FROM node:22-alpine AS base
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json ./
+COPY pnpm-lock.yaml* ./
+RUN corepack enable && pnpm install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+RUN pnpm build
+
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=build /app/public ./public
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+EXPOSE 3000
+CMD ["node", "server.js"]
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for a Next.js + Mongo stack > docker-compose.yml 1`] = `
+"services:
+  mongodb:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - db.adminCommand('ping')
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - yes
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - 3000:3000
+    environment:
+      NODE_ENV: \${NODE_ENV:-development}
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - redis
+volumes:
+  mongo_data: null
+  redis_data: null
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for a Next.js + Mongo stack > file tree 1`] = `
+[
+  ".dockerignore",
+  ".env",
+  ".env.example",
+  ".prettierignore",
+  ".prettierrc",
+  "docker-compose.yml",
+  "Dockerfile",
+  "eslint.config.mjs",
+  "next-env.d.ts",
+  "next.config.mjs",
+  "package.json",
+  "README.md",
+  "src/app/api/health/route.ts",
+  "src/app/layout.tsx",
+  "src/app/page.tsx",
+  "src/lib/db.ts",
+  "src/lib/redis.ts",
+  "tsconfig.json",
+]
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for a Next.js + Mongo stack > package.json 1`] = `
+"{
+  "name": "web-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "format": "prettier --write .",
+    "lint": "eslint .",
+    "start": "next start",
+    "start:dev": "next dev"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "mongoose": "^8.7.0",
+    "next": "^15.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^9.11.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.7.0"
+  }
+}
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for a Next.js + Mongo stack > src/lib/db.ts 1`] = `
+"import mongoose from 'mongoose';
+
+const uri = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/app';
+
+// Reuse the connection across hot reloads / lambda invocations.
+let promise: Promise<typeof mongoose> | undefined;
+
+export function db(): Promise<typeof mongoose> {
+  promise ??= mongoose.connect(uri);
+  return promise;
+}
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > .env 1`] = `
+"# --- postgres ---
+# TypeORM connection string (host 'postgres' = the compose service)
+DATABASE_URL=postgres://app:app@postgres:5432/app
+POSTGRES_USER=app
+POSTGRES_PASSWORD=app
+POSTGRES_DB=app
+
+# --- redis ---
+# ioredis connection string (host 'redis' = the compose service)
+REDIS_URL=redis://redis:6379
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > Dockerfile 1`] = `
+"# syntax=docker/dockerfile:1
+FROM node:22-alpine AS base
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json ./
+COPY package-lock.json* ./
+RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+FROM deps AS build
+COPY . .
+RUN npm run build
+
+FROM base AS runtime
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./
+EXPOSE 3000
+CMD ["node", "dist/main.js"]
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > README.md 1`] = `
+"# voting-app
+
+Generated with \`create-app\`. This project has no runtime dependency on the generator.
+
+## Stack
+
+- **Backend:** NestJS
+- **Database:** PostgreSQL
+- **Cache:** Redis
+- **Containerization:** Docker + Docker Compose
+- **Package manager:** npm
+
+## Components
+
+### NestJS
+
+Nest bootstraps in \`src/main.ts\`. Feature wiring (database, cache) is composed into \`src/app.module.ts\` by the generator based on the components you picked.
+
+### PostgreSQL
+
+\`DATABASE_URL\` drives the TypeORM connection. \`synchronize\` is enabled outside production; switch to migrations before deploying.
+
+### Redis
+
+ioredis client from \`REDIS_URL\`. NestJS: inject the \`@Global()\` \`RedisService\` (\`redisService.client\`). Next.js: import \`redis\` from \`src/lib/redis.ts\`.
+
+### Docker
+
+\`docker build -t <name> .\` builds the runtime image; the Compose file uses it.
+
+### Docker Compose
+
+\`docker compose up -d\` starts the app and its dependencies.
+
+## Getting started
+
+\`\`\`bash
+npm install
+docker compose up -d
+npm run start:dev
+\`\`\`
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > docker-compose.yml 1`] = `
+"services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U app -d app
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - yes
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    build: .
+    env_file:
+      - .env
+    ports:
+      - 3000:3000
+    environment:
+      NODE_ENV: \${NODE_ENV:-development}
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+volumes:
+  postgres_data: null
+  redis_data: null
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > file tree 1`] = `
+[
+  ".dockerignore",
+  ".env",
+  ".env.example",
+  ".prettierignore",
+  ".prettierrc",
+  "docker-compose.yml",
+  "Dockerfile",
+  "eslint.config.mjs",
+  "nest-cli.json",
+  "package.json",
+  "README.md",
+  "src/app.controller.ts",
+  "src/app.module.ts",
+  "src/app.service.ts",
+  "src/main.ts",
+  "src/redis/redis.module.ts",
+  "src/redis/redis.service.ts",
+  "tsconfig.build.json",
+  "tsconfig.json",
+]
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > package.json 1`] = `
+"{
+  "name": "voting-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "format": "prettier --write .",
+    "lint": "eslint .",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.0",
+    "@nestjs/core": "^10.4.0",
+    "@nestjs/platform-express": "^10.4.0",
+    "@nestjs/typeorm": "^10.0.2",
+    "ioredis": "^5.4.1",
+    "pg": "^8.12.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.0",
+    "@nestjs/schematics": "^10.1.4",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.0",
+    "eslint": "^9.11.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "source-map-support": "^0.5.21",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2",
+    "typescript-eslint": "^8.7.0"
+  }
+}
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > src/app.module.ts 1`] = `
+"import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { RedisModule } from './redis/redis.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+@Module({
+  imports: [
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      autoLoadEntities: true,
+      synchronize: process.env.NODE_ENV !== 'production',
+    }),
+    RedisModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+"
+`;

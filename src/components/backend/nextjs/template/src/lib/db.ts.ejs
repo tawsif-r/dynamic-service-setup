@@ -1,0 +1,24 @@
+<% if (has('postgres')) { -%>
+import { DataSource } from 'typeorm';
+
+// A single shared DataSource. Call `db.initialize()` once (e.g. in
+// instrumentation.ts) before running queries.
+export const db = new DataSource({
+  type: 'postgres',
+  url: process.env.DATABASE_URL,
+  synchronize: process.env.NODE_ENV !== 'production',
+  entities: [],
+});
+<% } else if (has('mongodb')) { -%>
+import mongoose from 'mongoose';
+
+const uri = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/app';
+
+// Reuse the connection across hot reloads / lambda invocations.
+let promise: Promise<typeof mongoose> | undefined;
+
+export function db(): Promise<typeof mongoose> {
+  promise ??= mongoose.connect(uri);
+  return promise;
+}
+<% } -%>

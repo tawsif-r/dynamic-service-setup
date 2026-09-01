@@ -1,0 +1,34 @@
+import { Module } from '@nestjs/common';
+<% if (has('postgres')) { -%>
+import { TypeOrmModule } from '@nestjs/typeorm';
+<% } -%>
+<% if (has('mongodb')) { -%>
+import { MongooseModule } from '@nestjs/mongoose';
+<% } -%>
+<% if (has('redis')) { -%>
+import { RedisModule } from './redis/redis.module';
+<% } -%>
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+@Module({
+  imports: [
+<% if (has('postgres')) { -%>
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      autoLoadEntities: true,
+      synchronize: process.env.NODE_ENV !== 'production',
+    }),
+<% } -%>
+<% if (has('mongodb')) { -%>
+    MongooseModule.forRoot(process.env.MONGODB_URI ?? 'mongodb://localhost:27017/app'),
+<% } -%>
+<% if (has('redis')) { -%>
+    RedisModule,
+<% } -%>
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
