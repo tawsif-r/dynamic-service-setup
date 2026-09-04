@@ -63,4 +63,51 @@ describe("built-in components", () => {
       expect(validateSelection(config, selected).errors).toEqual([]);
     }
   });
+
+  it("selects and validates a nestjs + postgres + redis + rabbitmq stack", () => {
+    const config = resolveConfig({
+      flags: {
+        name: "api",
+        backend: "nestjs",
+        database: "postgres",
+        cache: "redis",
+        queue: "rabbitmq",
+        docker: true,
+      },
+    });
+    const selected = createRegistry().select(config);
+    expect(selected.map((c) => c.id)).toEqual([
+      "nestjs",
+      "postgres",
+      "redis",
+      "rabbitmq",
+      "docker",
+      "docker-compose",
+      "eslint",
+      "prettier",
+      "git",
+    ]);
+    expect(validateSelection(config, selected).errors).toEqual([]);
+  });
+
+  it("rejects rabbitmq without docker or --external-rabbitmq", () => {
+    const config = resolveConfig({
+      flags: { name: "api", backend: "nestjs", queue: "rabbitmq", docker: false },
+    });
+    const selected = createRegistry().select(config);
+    expect(validateSelection(config, selected).errors).toEqual(
+      expect.arrayContaining([expect.stringContaining("queue 'rabbitmq' has nowhere to run")]),
+    );
+  });
+
+  it("selects and validates nextjs + rabbitmq without a database or cache", () => {
+    const config = resolveConfig({
+      flags: { name: "web", backend: "nextjs", queue: "rabbitmq", docker: true },
+    });
+    const selected = createRegistry().select(config);
+    expect(selected.map((c) => c.id)).toEqual(
+      expect.arrayContaining(["nextjs", "rabbitmq", "docker", "docker-compose"]),
+    );
+    expect(validateSelection(config, selected).errors).toEqual([]);
+  });
 });

@@ -11,9 +11,11 @@ export type CliFlagValues = {
   backend?: string;
   database?: string;
   cache?: string;
+  queue?: string;
   docker?: boolean;
   pm?: string;
   externalRedis?: boolean;
+  externalRabbitmq?: boolean;
   install?: boolean;
   git?: boolean;
   tooling?: string[];
@@ -37,12 +39,14 @@ export function flagsToConfig(flags: CliFlagValues): Partial<ProjectConfigInput>
     backend: flags.backend,
     database: flags.database,
     cache: flags.cache,
+    queue: flags.queue,
     docker: flags.docker,
     packageManager: flags.pm,
     tooling: flags.tooling,
     git: flags.git,
     install: flags.install,
     externalRedis: flags.externalRedis,
+    externalRabbitmq: flags.externalRabbitmq,
   }) as Partial<ProjectConfigInput>;
 }
 

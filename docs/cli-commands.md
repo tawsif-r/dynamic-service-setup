@@ -25,9 +25,9 @@ interactive question.
 | `src/util/target.ts` | `resolveTarget()` — turns `[name]` + `--dir` into `{ projectName, targetDir }`. Not part of `ProjectConfig`. |
 
 Current options (see `buildProgram()` in `src/cli.ts`): `--dir`, `--backend`,
-`--database`, `--cache`, `--docker` / `--no-docker`, `--pm`, `--preset`,
-`--external-redis`, `--no-install`, `--no-git`, `--dry-run`, `-y/--yes`,
-`--force`, plus `-v/--version` and the `[name]` positional.
+`--database`, `--cache`, `--queue`, `--docker` / `--no-docker`, `--pm`, `--preset`,
+`--external-redis`, `--external-rabbitmq`, `--no-install`, `--no-git`, `--dry-run`,
+`-y/--yes`, `--force`, plus `-v/--version` and the `[name]` positional.
 
 ---
 
@@ -173,7 +173,7 @@ are open `z.string()` on purpose — the registry validates them.
 - **Cancellation** (`Ctrl-C`) → `bailIfCancelled()` → `process.exit(130)`.
 - **Component menus** come from `registry.choicesFor(category)`, filtered to drop
   `unavailable` stubs, mapped to `{ value: id, label, hint: summary }`.
-  `database` / `cache` get a `None` option first (`allowNone`, `noneFirst`).
+  `database` / `cache` / `queue` get a `None` option first (`allowNone`, `noneFirst`).
 - The **directory** question is special: it's not a `ProjectConfig` field. It
   returns on `PromptResult.directory` and is skipped when `--dir` was passed or the
   `[name]` arg already carries a path (`src/cli.ts` computes `settledDir`).
@@ -196,8 +196,8 @@ if (decided.httpPort === undefined) {
 ```
 
 Order matters — questions run top to bottom. Name and directory come first, then
-backend → database → cache → docker → package manager → git. Put stack-shaping
-questions before dependent ones.
+backend → database → cache → queue → docker → package manager → git. Put
+stack-shaping questions before dependent ones.
 
 ### Reordering / removing
 

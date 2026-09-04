@@ -61,6 +61,18 @@ const redis: Component = {
   },
 };
 
+const rabbitmq: Component = {
+  id: "rabbitmq",
+  category: "queue",
+  label: "RabbitMQ",
+  node: { dependencies: { amqplib: "^0.10.4" } },
+  env: [{ key: "RABBITMQ_URL", value: "amqp://app:app@rabbitmq:5672" }],
+  compose: {
+    services: { rabbitmq: { image: "rabbitmq:3-management-alpine", ports: ["5672:5672"] } },
+    appDependsOn: ["rabbitmq"],
+  },
+};
+
 const dockerComposeComp: Component = { id: "docker-compose", category: "infra", label: "Docker Compose" };
 const dockerComp: Component = { id: "docker", category: "infra", label: "Docker" };
 
@@ -145,6 +157,21 @@ describe("mergeCompose", () => {
   it("returns nothing without the docker-compose component", () => {
     expect(mergeCompose(config({ docker: false }), [nestjs]).files).toEqual([]);
   });
+
+  it("composes a queue service alongside cache/database", () => {
+    const { files } = mergeCompose(config({ docker: true }), [
+      nestjs,
+      postgres,
+      redis,
+      rabbitmq,
+      dockerComp,
+      dockerComposeComp,
+    ]);
+    const doc = parseYaml(files[0]!.contents as string);
+    expect(Object.keys(doc.services).sort()).toEqual(["app", "postgres", "rabbitmq", "redis"]);
+    expect(doc.services.app.depends_on).toEqual(["postgres", "rabbitmq", "redis"]);
+    expect(doc.services.rabbitmq.image).toBe("rabbitmq:3-management-alpine");
+  });
 });
 
 describe("mergeEnv", () => {
@@ -156,6 +183,13 @@ describe("mergeEnv", () => {
     expect(body).toContain("DATABASE_URL=postgres://postgres:postgres@postgres:5432/app");
     expect(body).toContain("REDIS_URL=redis://redis:6379");
     expect(files[0]!.contents).toBe(files[1]!.contents);
+  });
+
+  it("includes a queue component's env entries", () => {
+    const { files } = mergeEnv(config(), [nestjs, rabbitmq]);
+    const body = files[0]!.contents as string;
+    expect(body).toContain("# --- rabbitmq ---");
+    expect(body).toContain("RABBITMQ_URL=amqp://app:app@rabbitmq:5672");
   });
 
   it("dedupes a repeated key and warns on a value clash", () => {

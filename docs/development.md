@@ -41,7 +41,7 @@ Requirements:
 
 ```bash
 # run the CLI from source (no build step) — args after `--` go to the CLI
-npm run dev -- my-app --backend nestjs --database postgres --cache redis --docker --pm npm --no-install --no-git
+npm run dev -- my-app --backend nestjs --database postgres --cache redis --queue rabbitmq --docker --pm npm --no-install --no-git
 
 # generate into a scratch dir and inspect the result
 npm run dev -- scratch --backend nextjs --database mongodb --cache redis --dir /tmp/ca -y
@@ -123,14 +123,14 @@ config resolution.
    separately by `resolveTarget()` in `src/util/target.ts` (combines the `[name]`
    arg — which may carry a path, `~/…`, or be absolute — with `--dir`).
 2. **Select components** (`Registry.select()` in `src/registry.ts`) — from the
-   config, produce an ordered `Component[]`: backend, then database/cache unless
-   `"none"`, then each tooling id, plus implied infra (`docker` + `docker-compose`
-   when `config.docker`) and `git`. Order is `CATEGORY_ORDER`. Unknown or
-   `unavailable` ids throw here with the list of known ids.
+   config, produce an ordered `Component[]`: backend, then database/cache/queue
+   unless `"none"`, then each tooling id, plus implied infra (`docker` +
+   `docker-compose` when `config.docker`) and `git`. Order is `CATEGORY_ORDER`.
+   Unknown or `unavailable` ids throw here with the list of known ids.
 3. **Validate the selection** (`assertValid()` in `src/engine/validate.ts`) —
    `requires` / `conflicts` (each token is a component id *or* a `provides`
    capability tag), duplicate exclusive capabilities (`sql-db`, `document-db`,
-   `primary-datastore`), and cross-cutting rules (redis needs a runtime,
+   `primary-datastore`), and cross-cutting rules (redis/rabbitmq need a runtime,
    `docker-compose` needs `docker`). **Fails before any file is written.**
    Non-fatal issues come back as `warnings`.
 4. **Compose files** (`composeFiles()` in `src/generate.ts`, pure):
@@ -181,6 +181,7 @@ src/
 │   ├── database/postgres/     manifest.ts (no template — wired via app.module)
 │   ├── database/mongodb/      manifest.ts
 │   ├── cache/redis/           manifest.ts + template/ (Nest-shaped, has('nestjs'))
+│   ├── queue/rabbitmq/        manifest.ts + template/ (Nest-shaped, has('nestjs'))
 │   ├── infra/docker/          manifest.ts + template/_dockerignore
 │   ├── infra/docker-compose/  manifest.ts — supplies the base `app` service
 │   └── tooling/{eslint,prettier,git}/  manifest.ts + template/
@@ -220,10 +221,11 @@ test/                          see docs/testing.md
 ### `ProjectConfig` (`src/config/schema.ts`)
 
 The validated description of *what to generate*. Key fields: `name`, `backend`,
-`database` (default `"none"`), `cache` (default `"none"`), `docker`,
-`packageManager`, `tooling: string[]` (default `["eslint", "prettier"]`), `git`,
-`install`, `externalRedis`. Component-id fields are **open `z.string()`** — the
-registry validates them, not the schema.
+`database` (default `"none"`), `cache` (default `"none"`), `queue` (default
+`"none"`), `docker`, `packageManager`, `tooling: string[]` (default `["eslint",
+"prettier"]`), `git`, `install`, `externalRedis`, `externalRabbitmq`.
+Component-id fields are **open `z.string()`** — the registry validates them, not
+the schema.
 
 `RunOptions` (also in that file) is *how the run behaves*, separate from the
 project contents: `targetDir`, `cwd` (for the "cd" hint only), `dryRun`, `force`.
@@ -302,16 +304,17 @@ There is **no shared "wire the database in" step**. Each backend owns how a
 database/cache connects:
 
 - **NestJS** — `backend/nestjs/template/src/app.module.ts.ejs` has `has('postgres')`
-  / `has('mongodb')` / `has('redis')` branches that conditionally add
-  `TypeOrmModule.forRoot(...)`, `MongooseModule.forRoot(...)`, `RedisModule`. The
-  framework glue package (`@nestjs/typeorm`, `@nestjs/mongoose`) is a **`combos`
-  entry on the `nestjs` manifest**, keyed on the database id — so the database
-  manifests carry only backend-agnostic deps (`pg`, `typeorm`, `mongoose`).
-- **Next.js** — no central module, so `backend/nextjs/template/src/lib/db.ts.ejs`
-  and `redis.ts.ejs` are singletons that render to nothing (→ dropped) unless the
-  matching component is selected.
-- **Cross-backend contamination guard** — `cache/redis/template/` files are `.ejs`
-  gated on `has('nestjs')` so the Nest-shaped `RedisModule`/`RedisService` don't
+  / `has('mongodb')` / `has('redis')` / `has('rabbitmq')` branches that conditionally
+  add `TypeOrmModule.forRoot(...)`, `MongooseModule.forRoot(...)`, `RedisModule`,
+  `RabbitmqModule`. The framework glue package (`@nestjs/typeorm`, `@nestjs/mongoose`)
+  is a **`combos` entry on the `nestjs` manifest**, keyed on the database id — so the
+  database manifests carry only backend-agnostic deps (`pg`, `typeorm`, `mongoose`).
+- **Next.js** — no central module, so `backend/nextjs/template/src/lib/db.ts.ejs`,
+  `redis.ts.ejs` and `rabbitmq.ts.ejs` are singletons that render to nothing
+  (→ dropped) unless the matching component is selected.
+- **Cross-backend contamination guard** — `cache/redis/template/` and
+  `queue/rabbitmq/template/` files are `.ejs` gated on `has('nestjs')` so the
+  Nest-shaped `RedisModule`/`RedisService`/`RabbitmqModule`/`RabbitmqService` don't
   leak into a Next.js project. `tooling/eslint`'s config is `.ejs` that adds
   `.next/**` to `ignores` only when `has('nextjs')`.
 
