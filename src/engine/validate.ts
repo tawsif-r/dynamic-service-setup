@@ -62,6 +62,12 @@ export function validateSelection(
     );
   }
 
+  if (config.queue === "rabbitmq" && !config.docker && !config.externalRabbitmq) {
+    errors.push(
+      "queue 'rabbitmq' has nowhere to run: enable --docker, or pass --external-rabbitmq if you host RabbitMQ yourself.",
+    );
+  }
+
   if (ids.has("docker-compose") && !ids.has("docker")) {
     errors.push("'docker-compose' requires the 'docker' component.");
   }

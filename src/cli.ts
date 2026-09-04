@@ -17,11 +17,13 @@ export type CliOptions = {
   backend?: string;
   database?: string;
   cache?: string;
+  queue?: string;
   docker?: boolean;
   pm?: string;
   preset?: string;
   dir?: string;
   externalRedis?: boolean;
+  externalRabbitmq?: boolean;
   install: boolean;
   git: boolean;
   dryRun?: boolean;
@@ -38,9 +40,11 @@ function explicitFlags(command: Command, name: string | undefined): CliFlagValue
     backend: explicit("backend") ? o.backend : undefined,
     database: explicit("database") ? o.database : undefined,
     cache: explicit("cache") ? o.cache : undefined,
+    queue: explicit("queue") ? o.queue : undefined,
     docker: explicit("docker") ? o.docker : undefined,
     pm: explicit("pm") ? o.pm : undefined,
     externalRedis: explicit("externalRedis") ? o.externalRedis : undefined,
+    externalRabbitmq: explicit("externalRabbitmq") ? o.externalRabbitmq : undefined,
     install: explicit("install") ? o.install : undefined,
     git: explicit("git") ? o.git : undefined,
   };
@@ -58,11 +62,13 @@ export function buildProgram(): Command {
     .option("--backend <id>", "backend component id (e.g. nestjs)")
     .option("--database <id>", "database component id (postgres | mongodb | none)")
     .option("--cache <id>", "cache component id (redis | none)")
+    .option("--queue <id>", "message queue component id (rabbitmq | none)")
     .option("--docker", "include Docker + Docker Compose")
     .option("--no-docker", "exclude Docker + Docker Compose")
     .option("--pm <manager>", "package manager (npm | pnpm | yarn)")
     .option("--preset <name>", "load a saved preset from ~/.config/create-app/presets")
     .option("--external-redis", "allow redis without a docker runtime")
+    .option("--external-rabbitmq", "allow rabbitmq without a docker runtime")
     .option("--no-install", "skip dependency installation")
     .option("--no-git", "skip git repository initialization")
     .option("--dry-run", "print the generation plan without writing files")

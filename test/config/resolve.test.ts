@@ -42,12 +42,14 @@ describe("resolveConfig", () => {
       backend: "nestjs",
       database: "none",
       cache: "none",
+      queue: "none",
       docker: true,
       packageManager: "npm",
       tooling: ["eslint", "prettier"],
       git: true,
       install: true,
       externalRedis: false,
+      externalRabbitmq: false,
     });
   });
 

@@ -7,7 +7,8 @@ runtime dependency on `create-app`.
 > Status: **Phases 1–2 done** (see `tasks.md`). Design in `plan.md`.
 >
 > Backends: **NestJS**, **Next.js** (App Router). Databases: **PostgreSQL**, **MongoDB**.
-> Cache: **Redis**. Plus Docker + Compose, a package manager, ESLint/Prettier, git.
+> Cache: **Redis**. Queue: **RabbitMQ**. Plus Docker + Compose, a package manager,
+> ESLint/Prettier, git.
 
 ## How it works
 
@@ -16,15 +17,15 @@ fragments: static template files, dependencies, env vars, a Docker Compose servi
 config wiring. A **composition engine** merges those fragments — so `docker-compose.yml`,
 `.env` and `package.json` are assembled from whatever you picked, never copied whole.
 
-Each **backend owns how a database/cache wires in**: NestJS injects modules into
-`app.module.ts`; Next.js gets singleton clients in `src/lib/` (`db.ts`, `redis.ts`),
-created only for the components you picked.
+Each **backend owns how a database/cache/queue wires in**: NestJS injects modules into
+`app.module.ts`; Next.js gets singleton clients in `src/lib/` (`db.ts`, `redis.ts`,
+`rabbitmq.ts`), created only for the components you picked.
 
 ## Develop
 
 ```bash
 npm install
-npm run dev -- my-app --backend nestjs --database postgres --cache redis --docker --pm npm
+npm run dev -- my-app --backend nestjs --database postgres --cache redis --queue rabbitmq --docker --pm npm
 npm test
 npm run build      # emits dist/ + copies component templates
 ```
@@ -33,7 +34,7 @@ npm run build      # emits dist/ + copies component templates
 
 ```bash
 create-app                       # interactive
-create-app voting-app --backend nestjs --database postgres --cache redis --docker --pm npm
+create-app voting-app --backend nestjs --database postgres --cache redis --queue rabbitmq --docker --pm npm
 create-app web-app   --backend nextjs --database mongodb  --cache redis --docker --pm pnpm
 
 # where it lands

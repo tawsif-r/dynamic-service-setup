@@ -132,6 +132,18 @@ Goal: prove the engine on a second backend/database combo with no engine reshapi
 
 ---
 
+### T16 — RabbitMQ queue component ✅
+- [x] New `queue` component category (`src/components/types.ts`, `registry.ts` `CATEGORY_ORDER`) — a `queue` config field alongside `database`/`cache`, defaulting to `"none"`, following the same shape as `cache`.
+- [x] `src/components/queue/rabbitmq/manifest.ts` + `template/` — `amqplib` dep, `RABBITMQ_URL`/`RABBITMQ_DEFAULT_USER`/`RABBITMQ_DEFAULT_PASS` env, compose `rabbitmq:3-management-alpine` service (AMQP + management UI ports) + `rabbitmq_data` volume + `rabbitmq-diagnostics` healthcheck + `appDependsOn`.
+- [x] `--queue <id>` / `--external-rabbitmq` CLI flags, `queue`/`externalRabbitmq` schema fields, a "Message queue" prompt — mirrors the redis/`--external-redis` pattern end to end (`cli.ts`, `resolve.ts`, `prompts.ts`, `validate.ts`).
+- [x] NestJS wiring: `app.module.ts.ejs` gets a `has('rabbitmq')` branch importing a `@Global()` `RabbitmqModule`/`RabbitmqService` (Nest-shaped, gated on `has('nestjs')` like `cache/redis`). Next.js: `src/lib/rabbitmq.ts.ejs` singleton channel, dropped when unselected.
+- [x] `src/components/index.ts` registers `rabbitmq`.
+- [x] Tests: `registry.test.ts`, `components.test.ts`, `engine/validate.test.ts`, `engine/merge.test.ts`, `config/resolve.test.ts`, new `snapshot.test.ts` fixture (nestjs + rabbitmq only).
+- [x] Verified: `npm test` (74 passing), typecheck clean; generated nestjs+postgres+redis+rabbitmq and nextjs+mongodb+rabbitmq stacks, `npm install` + `tsc --noEmit` + `eslint` clean against the real `amqplib`/`@types/amqplib` packages.
+- [x] Docs: `docs/development.md`, `docs/cli-commands.md`, `docs/adding-a-component.md`, root `README.md`.
+
+---
+
 ## Later phases (not started)
 
 - **P3**: ASP.NET backend + `merge-csproj.ts` implementation

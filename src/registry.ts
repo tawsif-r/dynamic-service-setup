@@ -7,6 +7,7 @@ const CATEGORY_ORDER: ComponentCategory[] = [
   "backend",
   "database",
   "cache",
+  "queue",
   "infra",
   "tooling",
   "vcs",
@@ -56,8 +57,9 @@ export class Registry {
 
   /**
    * Resolve the ordered set of components a config selects: the backend, a
-   * database and cache unless "none", each tooling id, plus the implied infra
-   * (`docker` + `docker-compose` when `config.docker`) and `git` when enabled.
+   * database, cache and queue unless "none", each tooling id, plus the implied
+   * infra (`docker` + `docker-compose` when `config.docker`) and `git` when
+   * enabled.
    */
   select(config: ProjectConfig): Component[] {
     const picked = new Map<string, Component>();
@@ -70,6 +72,9 @@ export class Registry {
     }
     if (config.cache && config.cache !== "none") {
       add(this.demand(config.cache, "cache"));
+    }
+    if (config.queue && config.queue !== "none") {
+      add(this.demand(config.queue, "queue"));
     }
     for (const tool of config.tooling) {
       add(this.demand(tool, "tooling component"));

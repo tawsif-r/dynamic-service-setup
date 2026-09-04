@@ -85,6 +85,9 @@ export async function promptForConfig(opts: PromptOptions): Promise<PromptResult
   if (decided.cache === undefined) {
     answers.cache = await pickOne("cache", "Cache", { allowNone: true, noneFirst: true });
   }
+  if (decided.queue === undefined) {
+    answers.queue = await pickOne("queue", "Message queue", { allowNone: true, noneFirst: true });
+  }
 
   if (decided.docker === undefined) {
     const docker = await p.confirm({ message: "Include Docker + Docker Compose?", initialValue: true });
