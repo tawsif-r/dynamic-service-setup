@@ -12,6 +12,7 @@ const fakes: Component[] = [
   comp("postgres", "database", { provides: ["sql-db"] }),
   comp("mongodb", "database", { unavailable: "planned for Phase 2" }),
   comp("redis", "cache"),
+  comp("rabbitmq", "queue"),
   comp("docker", "infra"),
   comp("docker-compose", "infra"),
   comp("eslint", "tooling"),
@@ -40,12 +41,13 @@ describe("Registry", () => {
 
   it("select resolves the full slice in category order", () => {
     const picked = registry().select(
-      config({ database: "postgres", cache: "redis", docker: true, git: true }),
+      config({ database: "postgres", cache: "redis", queue: "rabbitmq", docker: true, git: true }),
     );
     expect(picked.map((c) => c.id)).toEqual([
       "nestjs",
       "postgres",
       "redis",
+      "rabbitmq",
       "docker",
       "docker-compose",
       "eslint",
@@ -54,9 +56,9 @@ describe("Registry", () => {
     ]);
   });
 
-  it("skips database/cache when 'none'", () => {
+  it("skips database/cache/queue when 'none'", () => {
     const picked = registry().select(
-      config({ database: "none", cache: "none", docker: false, git: false, tooling: [] }),
+      config({ database: "none", cache: "none", queue: "none", docker: false, git: false, tooling: [] }),
     );
     expect(picked.map((c) => c.id)).toEqual(["nestjs"]);
   });

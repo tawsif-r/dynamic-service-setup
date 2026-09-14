@@ -83,7 +83,7 @@ and an optional `template/` folder.
 ```ts
 interface Component {
   id: string;                 // "nestjs", "postgres", "redis"
-  category: "backend" | "database" | "cache" | "infra" | "tooling" | "vcs";
+  category: "backend" | "database" | "cache" | "queue" | "infra" | "tooling" | "vcs";
   label: string;              // shown in prompts
   runtime?: "node" | "dotnet"; // backends declare this; drives which mergers apply
 

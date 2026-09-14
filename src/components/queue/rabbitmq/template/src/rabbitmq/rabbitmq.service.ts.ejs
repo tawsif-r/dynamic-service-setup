@@ -1,0 +1,25 @@
+<% if (has('nestjs')) { -%>
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { connect } from 'amqplib';
+
+type RabbitConnection = Awaited<ReturnType<typeof connect>>;
+type RabbitChannel = Awaited<ReturnType<RabbitConnection['createChannel']>>;
+
+@Injectable()
+export class RabbitmqService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(RabbitmqService.name);
+  private connection?: RabbitConnection;
+  channel?: RabbitChannel;
+
+  async onModuleInit() {
+    this.connection = await connect(process.env.RABBITMQ_URL ?? 'amqp://localhost:5672');
+    this.connection.on('error', (err) => this.logger.error(err.message));
+    this.channel = await this.connection.createChannel();
+  }
+
+  async onModuleDestroy() {
+    await this.channel?.close();
+    await this.connection?.close();
+  }
+}
+<% } -%>

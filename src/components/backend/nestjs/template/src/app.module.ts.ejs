@@ -8,6 +8,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 <% if (has('redis')) { -%>
 import { RedisModule } from './redis/redis.module';
 <% } -%>
+<% if (has('rabbitmq')) { -%>
+import { RabbitmqModule } from './rabbitmq/rabbitmq.module';
+<% } -%>
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -26,6 +29,9 @@ import { AppService } from './app.service';
 <% } -%>
 <% if (has('redis')) { -%>
     RedisModule,
+<% } -%>
+<% if (has('rabbitmq')) { -%>
+    RabbitmqModule,
 <% } -%>
   ],
   controllers: [AppController],

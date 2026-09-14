@@ -24,7 +24,7 @@ src/components/<category>/<id>/
 └── template/          optional — EJS + plain files, copied to the project root
 ```
 
-`<category>` is one of `backend | database | cache | infra | tooling | vcs`.
+`<category>` is one of `backend | database | cache | queue | infra | tooling | vcs`.
 `<id>` is the string the user passes (`--database postgres`) — keep it short and
 lowercase.
 
@@ -127,7 +127,7 @@ Then in `src/components/index.ts`:
 import { mysql } from "./database/mysql/manifest.js";
 // ...
 export const builtinComponents: Component[] = [
-  nestjs, nextjs, postgres, mongodb, mysql, redis, docker, dockerCompose,
+  nestjs, nextjs, postgres, mongodb, mysql, redis, rabbitmq, docker, dockerCompose,
   eslint, prettier, git,
 ];
 ```

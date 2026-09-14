@@ -14,6 +14,7 @@ function config(overrides: Record<string, unknown> = {}) {
 const nestjs = comp("nestjs", "backend", { runtime: "node" });
 const postgres = comp("postgres", "database", { provides: ["sql-db"] });
 const redis = comp("redis", "cache");
+const rabbitmq = comp("rabbitmq", "queue");
 const docker = comp("docker", "infra");
 const dockerCompose = comp("docker-compose", "infra", { requires: ["docker"] });
 
@@ -35,6 +36,19 @@ describe("validateSelection", () => {
     const res = validateSelection(
       config({ cache: "redis", docker: false, externalRedis: true }),
       [nestjs, redis],
+    );
+    expect(res.errors).toEqual([]);
+  });
+
+  it("flags rabbitmq with no docker and no --external-rabbitmq", () => {
+    const res = validateSelection(config({ queue: "rabbitmq", docker: false }), [nestjs, rabbitmq]);
+    expect(res.errors.join()).toMatch(/nowhere to run/);
+  });
+
+  it("accepts rabbitmq without docker when --external-rabbitmq is set", () => {
+    const res = validateSelection(
+      config({ queue: "rabbitmq", docker: false, externalRabbitmq: true }),
+      [nestjs, rabbitmq],
     );
     expect(res.errors).toEqual([]);
   });

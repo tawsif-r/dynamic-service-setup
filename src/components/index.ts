@@ -6,6 +6,7 @@ import { aspnetWebapi } from "./backend/aspnet-webapi/manifest.js";
 import { postgres } from "./database/postgres/manifest.js";
 import { mongodb } from "./database/mongodb/manifest.js";
 import { redis } from "./cache/redis/manifest.js";
+import { rabbitmq } from "./queue/rabbitmq/manifest.js";
 import { docker } from "./infra/docker/manifest.js";
 import { dockerCompose } from "./infra/docker-compose/manifest.js";
 import { eslint } from "./tooling/eslint/manifest.js";
@@ -24,6 +25,7 @@ export const builtinComponents: Component[] = [
   postgres,
   mongodb,
   redis,
+  rabbitmq,
   docker,
   dockerCompose,
   eslint,

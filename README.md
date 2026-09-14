@@ -55,7 +55,7 @@ remember:
 
 ```bash
 npm install
-npm run dev -- my-app --backend nestjs --database postgres --cache redis --docker --pm npm
+npm run dev -- my-app --backend nestjs --database postgres --cache redis --queue rabbitmq --docker --pm npm
 npm test
 npm run build      # emits dist/ + copies component templates
 ```
@@ -64,7 +64,7 @@ npm run build      # emits dist/ + copies component templates
 
 ```bash
 create-app                       # interactive
-create-app voting-app --backend nestjs --database postgres --cache redis --docker --pm npm
+create-app voting-app --backend nestjs --database postgres --cache redis --queue rabbitmq --docker --pm npm
 create-app web-app   --backend nextjs --database mongodb  --cache redis --docker --pm pnpm
 create-app orders-api --backend aspnet-minimal --database postgres --docker
 

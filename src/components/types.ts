@@ -4,6 +4,7 @@ export type ComponentCategory =
   | "backend"
   | "database"
   | "cache"
+  | "queue"
   | "infra"
   | "tooling"
   | "vcs";

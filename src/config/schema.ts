@@ -7,10 +7,11 @@ export type PackageManager = (typeof PACKAGE_MANAGERS)[number];
 /**
  * The resolved description of a project to generate.
  *
- * Component ids (`backend`, `database`, `cache`, `tooling[]`) are kept as open
- * strings on purpose: the registry + `validate()` are the source of truth for
- * which ids exist, so adding a component never requires editing this schema.
- * `"none"` is the conventional opt-out value for `database` / `cache`.
+ * Component ids (`backend`, `database`, `cache`, `queue`, `tooling[]`) are kept
+ * as open strings on purpose: the registry + `validate()` are the source of
+ * truth for which ids exist, so adding a component never requires editing this
+ * schema. `"none"` is the conventional opt-out value for `database` / `cache` /
+ * `queue`.
  */
 export const projectConfigSchema = z.object({
   name: z
@@ -25,6 +26,7 @@ export const projectConfigSchema = z.object({
     .min(1, "a backend must be selected"),
   database: z.string().min(1).default("none"),
   cache: z.string().min(1).default("none"),
+  queue: z.string().min(1).default("none"),
   docker: z.boolean().default(true),
   packageManager: z.enum(PACKAGE_MANAGERS).default("npm"),
   tooling: z.array(z.string()).default(["eslint", "prettier"]),
@@ -32,6 +34,8 @@ export const projectConfigSchema = z.object({
   install: z.boolean().default(true),
   /** Allow selecting `cache: redis` without a docker runtime to host it. */
   externalRedis: z.boolean().default(false),
+  /** Allow selecting `queue: rabbitmq` without a docker runtime to host it. */
+  externalRabbitmq: z.boolean().default(false),
 });
 
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;

@@ -49,6 +49,38 @@ describe("generateProject (v1 slice, no install/git)", () => {
     expect(await read(result.projectDir, "README.md")).toMatchSnapshot("README.md");
   });
 
+  it("produces the expected file tree and artifacts for a RabbitMQ stack", async () => {
+    const config = resolveConfig({
+      flags: {
+        name: "worker-app",
+        backend: "nestjs",
+        database: "none",
+        cache: "none",
+        queue: "rabbitmq",
+        docker: true,
+        packageManager: "npm",
+        install: false,
+        git: false,
+      },
+    });
+
+    const result = await generateProject({
+      config,
+      run: { targetDir: tmp.dir, cwd: tmp.dir, dryRun: false, force: false },
+      registry: createRegistry(),
+      logger: silentLogger,
+    });
+
+    expect(result.warnings).toEqual([]);
+    expect(result.files).toContain("src/rabbitmq/rabbitmq.module.ts");
+    expect(result.files).toContain("src/rabbitmq/rabbitmq.service.ts");
+
+    expect(await read(result.projectDir, "docker-compose.yml")).toMatchSnapshot("docker-compose.yml");
+    expect(await read(result.projectDir, "package.json")).toMatchSnapshot("package.json");
+    expect(await read(result.projectDir, ".env")).toMatchSnapshot(".env");
+    expect(await read(result.projectDir, "src/app.module.ts")).toMatchSnapshot("src/app.module.ts");
+  });
+
   it("produces the expected file tree and artifacts for a Next.js + Mongo stack", async () => {
     const config = resolveConfig({
       flags: {
@@ -167,6 +199,7 @@ describe("generateProject (v1 slice, no install/git)", () => {
         backend: "nestjs",
         database: "none",
         cache: "none",
+        queue: "none",
         docker: false,
         install: false,
         git: false,
@@ -183,9 +216,11 @@ describe("generateProject (v1 slice, no install/git)", () => {
     expect(result.files).not.toContain("docker-compose.yml");
     expect(result.files).not.toContain("Dockerfile");
     expect(result.files).not.toContain("src/redis/redis.module.ts");
+    expect(result.files).not.toContain("src/rabbitmq/rabbitmq.module.ts");
     const appModule = await read(result.projectDir, "src/app.module.ts");
     expect(appModule).not.toContain("TypeOrmModule");
     expect(appModule).not.toContain("RedisModule");
+    expect(appModule).not.toContain("RabbitmqModule");
   });
 
   it("refuses to overwrite an existing directory without --force", async () => {
