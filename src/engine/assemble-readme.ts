@@ -11,13 +11,16 @@ const RUN_PREFIX: Record<string, string> = { npm: "npm run", pnpm: "pnpm", yarn:
 export function assembleReadme(config: ProjectConfig, selected: Component[]): MergeResult {
   const byCategory = (cat: Component["category"]) =>
     selected.find((c) => c.category === cat);
+  const isDotnet = byCategory("backend")?.runtime === "dotnet";
 
   const stackLines = [
     `- **Backend:** ${byCategory("backend")?.label ?? "—"}`,
     `- **Database:** ${byCategory("database")?.label ?? "none"}`,
     `- **Cache:** ${byCategory("cache")?.label ?? "none"}`,
     `- **Containerization:** ${config.docker ? "Docker + Docker Compose" : "none"}`,
-    `- **Package manager:** ${config.packageManager}`,
+    // packageManager is meaningless for dotnet (NuGet is implicit) — validate.ts
+    // already warns about this, so don't repeat a misleading value here.
+    ...(isDotnet ? [] : [`- **Package manager:** ${config.packageManager}`]),
   ];
 
   const sections = selected
@@ -29,9 +32,9 @@ export function assembleReadme(config: ProjectConfig, selected: Component[]): Me
     "## Getting started",
     "",
     "```bash",
-    `${config.packageManager} install`,
+    ...(isDotnet ? ["dotnet restore"] : [`${config.packageManager} install`]),
     ...(config.docker ? ["docker compose up -d"] : []),
-    `${run} start:dev`,
+    isDotnet ? "dotnet run" : `${run} start:dev`,
     "```",
     "",
   ];

@@ -1,0 +1,19 @@
+using Microsoft.AspNetCore.Mvc;
+
+namespace <%= dotnetNamespace %>.Controllers;
+
+[ApiController]
+[Route("")]
+public class HealthController : ControllerBase
+{
+    private static readonly DateTimeOffset StartedAt = DateTimeOffset.UtcNow;
+
+    [HttpGet]
+    public IActionResult Get() => Ok(new
+    {
+        status = "ok",
+        // clamp at 0 — StartedAt is a lazily-initialized static field, so the very
+        // first request can observe a few microseconds of clock jitter as negative
+        uptime = Math.Max(0, (DateTimeOffset.UtcNow - StartedAt).TotalSeconds),
+    });
+}

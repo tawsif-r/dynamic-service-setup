@@ -1,6 +1,10 @@
 import type { PackageManager, ProjectConfig } from "../config/schema.js";
 import type { Component, DockerfileStage } from "../components/types.js";
 import type { MergeResult } from "./files.js";
+import { toDotnetIdentifier } from "../util/dotnet-identifier.js";
+
+const DOTNET_SDK_IMAGE = "mcr.microsoft.com/dotnet/sdk:10.0";
+const DOTNET_RUNTIME_IMAGE = "mcr.microsoft.com/dotnet/aspnet:10.0";
 
 const LOCKFILE: Record<PackageManager, string> = {
   npm: "package-lock.json",
@@ -30,21 +34,13 @@ function injected(stages: DockerfileStage[], at: DockerfileStage["at"]): string[
  * Build a Node multi-stage `Dockerfile` for the app image, parameterised by the
  * chosen package manager. Components may inject extra lines via
  * `dockerfile.stages` anchored at `prelude | deps | build | runtime`.
- * Only emitted when the `docker` component is selected. dotnet backends will
- * get their own path in Phase 3.
  */
-export function mergeDockerfile(config: ProjectConfig, selected: Component[]): MergeResult {
-  const backend = selected.find((c) => c.category === "backend");
-  if (!selected.some((c) => c.id === "docker")) return { files: [], warnings: [] };
-  if (backend && backend.runtime !== "node") {
-    return {
-      files: [],
-      warnings: [`Dockerfile generation for runtime "${backend.runtime}" is not implemented yet.`],
-    };
-  }
-
+function buildNodeDockerfile(
+  config: ProjectConfig,
+  backend: Component | undefined,
+  stages: DockerfileStage[],
+): string {
   const pm = config.packageManager;
-  const stages = selected.flatMap((c) => c.dockerfile?.stages ?? []);
 
   // Runtime CMD and the runtime-stage COPY lines default to a `tsc`-style
   // `dist/` layout (NestJS); a backend manifest overrides both when its build
@@ -83,5 +79,60 @@ export function mergeDockerfile(config: ProjectConfig, selected: Component[]): M
     "",
   ];
 
-  return { files: [{ path: "Dockerfile", contents: lines.join("\n") }], warnings: [] };
+  return lines.join("\n");
+}
+
+/**
+ * Build a dotnet SDK/runtime multi-stage `Dockerfile`: restore + publish against
+ * the generated `.csproj` in the SDK image, then copy the publish output into the
+ * slim ASP.NET runtime image. The entrypoint DLL name is derived from
+ * `config.name` the same way `merge-csproj.ts` derives `AssemblyName`, so the two
+ * always agree without either one needing to know about the other.
+ */
+function buildDotnetDockerfile(
+  config: ProjectConfig,
+  backend: Component | undefined,
+  stages: DockerfileStage[],
+): string {
+  const ident = toDotnetIdentifier(config.name);
+  const cmd = backend?.dockerfile?.cmd ?? ["dotnet", `${ident}.dll`];
+  const cmdJson = `[${cmd.map((s) => JSON.stringify(s)).join(", ")}]`;
+
+  const lines = [
+    "# syntax=docker/dockerfile:1",
+    `FROM ${DOTNET_SDK_IMAGE} AS build`,
+    "WORKDIR /src",
+    ...injected(stages, "prelude"),
+    "COPY *.csproj ./",
+    "RUN dotnet restore",
+    ...injected(stages, "deps"),
+    "COPY . .",
+    "RUN dotnet publish -c Release -o /app/publish",
+    ...injected(stages, "build"),
+    "",
+    `FROM ${DOTNET_RUNTIME_IMAGE} AS runtime`,
+    "WORKDIR /app",
+    "COPY --from=build /app/publish .",
+    ...injected(stages, "runtime"),
+    "EXPOSE 3000",
+    "ENV ASPNETCORE_URLS=http://+:3000",
+    `ENTRYPOINT ${cmdJson}`,
+    "",
+  ];
+
+  return lines.join("\n");
+}
+
+/** Only emitted when the `docker` component is selected. */
+export function mergeDockerfile(config: ProjectConfig, selected: Component[]): MergeResult {
+  const backend = selected.find((c) => c.category === "backend");
+  if (!selected.some((c) => c.id === "docker")) return { files: [], warnings: [] };
+
+  const stages = selected.flatMap((c) => c.dockerfile?.stages ?? []);
+  const contents =
+    backend?.runtime === "dotnet"
+      ? buildDotnetDockerfile(config, backend, stages)
+      : buildNodeDockerfile(config, backend, stages);
+
+  return { files: [{ path: "Dockerfile", contents }], warnings: [] };
 }

@@ -1,0 +1,14 @@
+<% if (has('postgres')) { -%>
+using Microsoft.EntityFrameworkCore;
+
+namespace <%= dotnetNamespace %>.Data;
+
+// Empty by design — add DbSet<T> properties per entity as the app grows.
+// Registered against Npgsql in Program.cs.
+public class AppDbContext : DbContext
+{
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+    }
+}
+<% } -%>

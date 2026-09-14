@@ -152,6 +152,207 @@ export function db(): Promise<typeof mongoose> {
 "
 `;
 
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Minimal API + Postgres stack > Dockerfile 1`] = `
+"# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY *.csproj ./
+RUN dotnet restore
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 3000
+ENV ASPNETCORE_URLS=http://+:3000
+ENTRYPOINT ["dotnet", "orders_api.dll"]
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Minimal API + Postgres stack > Program.cs 1`] = `
+"using Microsoft.EntityFrameworkCore;
+using orders_api.Data;
+using StackExchange.Redis;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(Environment.GetEnvironmentVariable("DATABASE_URL")));
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(Environment.GetEnvironmentVariable("REDIS_URL") ?? "localhost:6379"));
+
+var app = builder.Build();
+
+var startedAt = DateTimeOffset.UtcNow;
+app.MapGet("/", () => Results.Ok(new
+{
+    status = "ok",
+    uptime = Math.Max(0, (DateTimeOffset.UtcNow - startedAt).TotalSeconds),
+}));
+
+app.Run();
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Minimal API + Postgres stack > README.md 1`] = `
+"# orders-api
+
+Generated with \`create-app\`. This project has no runtime dependency on the generator.
+
+## Stack
+
+- **Backend:** ASP.NET Core (Minimal API)
+- **Database:** PostgreSQL
+- **Cache:** Redis
+- **Containerization:** Docker + Docker Compose
+
+## Components
+
+### ASP.NET Core (Minimal API)
+
+\`Program.cs\` wires up the app top-to-bottom: database/cache registration, then route handlers. Add more \`app.MapGet\`/\`app.MapPost\` calls per endpoint, or move groups of them into extension methods as the app grows.
+
+### PostgreSQL
+
+\`DATABASE_URL\` is the Postgres connection string. Node backends use TypeORM (\`synchronize\` is enabled outside production; switch to migrations before deploying). ASP.NET backends use EF Core via \`Npgsql.EntityFrameworkCore.PostgreSQL\`, registered on \`AppDbContext\` in \`Program.cs\`.
+
+### Redis
+
+\`REDIS_URL\` is the Redis connection string. NestJS: inject the \`@Global()\` \`RedisService\` (\`redisService.client\`). Next.js: import \`redis\` from \`src/lib/redis.ts\`. ASP.NET: a singleton \`IConnectionMultiplexer\` is registered in \`Program.cs\` via \`StackExchange.Redis\`.
+
+### Docker
+
+\`docker build -t <name> .\` builds the runtime image; the Compose file uses it.
+
+### Docker Compose
+
+\`docker compose up -d\` starts the app and its dependencies.
+
+## Getting started
+
+\`\`\`bash
+dotnet restore
+docker compose up -d
+dotnet run
+\`\`\`
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Minimal API + Postgres stack > file tree 1`] = `
+[
+  ".dockerignore",
+  ".env",
+  ".env.example",
+  "appsettings.Development.json",
+  "appsettings.json",
+  "Data/AppDbContext.cs",
+  "docker-compose.yml",
+  "Dockerfile",
+  "orders_api.csproj",
+  "Program.cs",
+  "Properties/launchSettings.json",
+  "README.md",
+]
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Minimal API + Postgres stack > orders_api.csproj 1`] = `
+"<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>orders_api</RootNamespace>
+    <AssemblyName>orders_api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+  </ItemGroup>
+
+</Project>
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Web API + Mongo stack > Controllers/HealthController.cs 1`] = `
+"using Microsoft.AspNetCore.Mvc;
+
+namespace catalog_api.Controllers;
+
+[ApiController]
+[Route("")]
+public class HealthController : ControllerBase
+{
+    private static readonly DateTimeOffset StartedAt = DateTimeOffset.UtcNow;
+
+    [HttpGet]
+    public IActionResult Get() => Ok(new
+    {
+        status = "ok",
+        // clamp at 0 — StartedAt is a lazily-initialized static field, so the very
+        // first request can observe a few microseconds of clock jitter as negative
+        uptime = Math.Max(0, (DateTimeOffset.UtcNow - StartedAt).TotalSeconds),
+    });
+}
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Web API + Mongo stack > Program.cs 1`] = `
+"using MongoDB.Driver;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+
+builder.Services.AddSingleton<IMongoClient>(_ =>
+    new MongoClient(Environment.GetEnvironmentVariable("MONGODB_URI") ?? "mongodb://localhost:27017/app"));
+
+var app = builder.Build();
+
+app.MapControllers();
+
+app.Run();
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Web API + Mongo stack > catalog_api.csproj 1`] = `
+"<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>catalog_api</RootNamespace>
+    <AssemblyName>catalog_api</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="3.11.2" />
+  </ItemGroup>
+
+</Project>
+"
+`;
+
+exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and artifacts for an ASP.NET Web API + Mongo stack > file tree 1`] = `
+[
+  ".dockerignore",
+  ".env",
+  ".env.example",
+  "appsettings.Development.json",
+  "appsettings.json",
+  "catalog_api.csproj",
+  "Controllers/HealthController.cs",
+  "docker-compose.yml",
+  "Dockerfile",
+  "Program.cs",
+  "Properties/launchSettings.json",
+  "README.md",
+]
+`;
+
 exports[`generateProject (v1 slice, no install/git) > produces the expected file tree and composed artifacts > .env 1`] = `
 "# --- postgres ---
 # TypeORM connection string (host 'postgres' = the compose service)
@@ -211,11 +412,11 @@ Nest bootstraps in \`src/main.ts\`. Feature wiring (database, cache) is composed
 
 ### PostgreSQL
 
-\`DATABASE_URL\` drives the TypeORM connection. \`synchronize\` is enabled outside production; switch to migrations before deploying.
+\`DATABASE_URL\` is the Postgres connection string. Node backends use TypeORM (\`synchronize\` is enabled outside production; switch to migrations before deploying). ASP.NET backends use EF Core via \`Npgsql.EntityFrameworkCore.PostgreSQL\`, registered on \`AppDbContext\` in \`Program.cs\`.
 
 ### Redis
 
-ioredis client from \`REDIS_URL\`. NestJS: inject the \`@Global()\` \`RedisService\` (\`redisService.client\`). Next.js: import \`redis\` from \`src/lib/redis.ts\`.
+\`REDIS_URL\` is the Redis connection string. NestJS: inject the \`@Global()\` \`RedisService\` (\`redisService.client\`). Next.js: import \`redis\` from \`src/lib/redis.ts\`. ASP.NET: a singleton \`IConnectionMultiplexer\` is registered in \`Program.cs\` via \`StackExchange.Redis\`.
 
 ### Docker
 

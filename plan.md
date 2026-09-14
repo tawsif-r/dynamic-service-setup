@@ -145,7 +145,10 @@ interface Component {
   with `docker compose config`.
 - **`package.json`** (`merge-package-json.ts`) — `runtime: "node"` only. Base metadata +
   union of every component's `node.*`. Conflicting version specs → validation warning.
-- **`.csproj`** (`merge-csproj.ts`) — dotnet, Phase 3; interface stubbed from the start.
+- **`.csproj`** (`merge-csproj.ts`) — `runtime: "dotnet"` only. Project shell
+  (SDK/TargetFramework/RootNamespace/AssemblyName, the latter two from
+  `util/dotnet-identifier.ts`) + union of every component's `dotnet.packages` as
+  `<PackageReference>`, same collision policy as `merge-package-json.ts`.
 - **`.env` / `.env.example`** (`merge-env.ts`) — union of `env` entries, deduped by key,
   grouped by contributing component. `postgres` → `DATABASE_URL`, `redis` → `REDIS_URL`.
 - **`Dockerfile`** (`merge-dockerfile.ts`) — pm-aware Node multi-stage. Runtime `CMD`
@@ -166,6 +169,13 @@ Each backend owns *how* a database/cache wires in — there is no shared wiring 
 - **Next.js**: no central module, so the backend template ships `src/lib/db.ts.ejs` and
   `src/lib/redis.ts.ejs` singletons that render empty (→ dropped) unless the matching
   component is selected.
+- **ASP.NET Core** (`aspnet-minimal`, `aspnet-webapi`): same central-file pattern as
+  NestJS — `Program.cs.ejs` conditionally registers `AddDbContext<AppDbContext>` (EF
+  Core + Npgsql) / a singleton `IMongoClient` / a singleton `IConnectionMultiplexer`
+  based on `has(...)`. No backend-specific glue package is needed (ASP.NET's DI needs
+  none), so the NuGet packages (`Npgsql.EntityFrameworkCore.PostgreSQL`,
+  `MongoDB.Driver`, `StackExchange.Redis`) live directly on the database/cache
+  manifests' `dotnet.packages`, mirroring where their `node.dependencies` live.
 
 No AST codemod. `ts-morph`-based `configPatches` is a reserved manifest field, unused in
 v1.
@@ -192,8 +202,11 @@ create-app/
 │   │   ├── types.ts
 │   │   ├── index.ts          # explicit list of built-in components
 │   │   ├── backend/nestjs/{manifest.ts, template/}
+│   │   ├── backend/nextjs/{manifest.ts, template/}
+│   │   ├── backend/aspnet-minimal/{manifest.ts, template/}
+│   │   ├── backend/aspnet-webapi/{manifest.ts, template/}
 │   │   ├── database/postgres/{manifest.ts, template/}
-│   │   ├── database/mongodb/manifest.ts        # stub, Phase 2
+│   │   ├── database/mongodb/manifest.ts
 │   │   ├── cache/redis/{manifest.ts, template/}
 │   │   ├── infra/docker/{manifest.ts, template/}
 │   │   ├── infra/docker-compose/{manifest.ts, template/}
@@ -205,7 +218,7 @@ create-app/
 │   │   ├── merge-compose.ts
 │   │   ├── merge-env.ts
 │   │   ├── merge-dockerfile.ts
-│   │   ├── merge-csproj.ts   # Phase 3 body; stub now
+│   │   ├── merge-csproj.ts
 │   │   └── assemble-readme.ts
 │   ├── exec/
 │   │   ├── package-manager.ts
@@ -250,8 +263,8 @@ already provided.
 |---|---|---|---|
 | **1** | Skeleton, config/registry/validate/engine/exec, the NestJS+Postgres+Redis+Docker+pm+git+eslint+prettier slice, both invocation modes | Composition engine works end-to-end | ✅ done |
 | **2** | Next.js backend; MongoDB database | Second node backend + DB swap without engine changes | ✅ done — additive only: "empty `.ejs` dropped" rule, generic `combos`, `dockerfile.cmd`/`runtimeStage` |
-| **3** | ASP.NET backend; `merge-csproj.ts` body | `runtime: "dotnet"` path | not started |
-| **4** | Preset files (`--preset nest-api`), extra tooling (CI workflow, husky, commitlint) | Presets solve real-world repetition | not started |
+| **3** | Two ASP.NET Core backends (Minimal API, Web API); `merge-csproj.ts` body | `runtime: "dotnet"` path | ✅ done — additive: `dotnetNamespace` render field, `DotnetContribution.sdk`, dotnet branch in `merge-dockerfile.ts`/`assemble-readme.ts`/`generate.ts`/`post-generate.ts`, `node-runtime` capability tag |
+| **4** | More dotnet backend templates (MVC, Blazor, Worker Service); preset files (`--preset nest-api`); extra tooling (CI workflow, husky, commitlint) | Presets solve real-world repetition | not started |
 | **5** | User component dir `~/.config/create-app/components/` loaded by the registry | Personal/company components without forking | not started |
 
 ---

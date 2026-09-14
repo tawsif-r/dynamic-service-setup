@@ -4,21 +4,31 @@ import ejs from "ejs";
 import type { ProjectConfig } from "../config/schema.js";
 import type { Component } from "../components/types.js";
 import type { FileMap } from "./files.js";
+import { toDotnetIdentifier } from "../util/dotnet-identifier.js";
 
 /**
  * Data available to every `.ejs` template.
  *   <%= config.name %>            resolved project config
  *   <% if (has("redis")) { %>     is a component id selected?
+ *   <%= dotnetNamespace %>        C#-safe identifier derived from config.name —
+ *                                 matches the RootNamespace/AssemblyName merge-csproj.ts
+ *                                 emits, so dotnet templates stay in sync with it.
  */
 export type RenderContext = {
   config: ProjectConfig;
   components: Component[];
   has: (id: string) => boolean;
+  dotnetNamespace: string;
 };
 
 export function makeRenderContext(config: ProjectConfig, components: Component[]): RenderContext {
   const ids = new Set(components.map((c) => c.id));
-  return { config, components, has: (id: string) => ids.has(id) };
+  return {
+    config,
+    components,
+    has: (id: string) => ids.has(id),
+    dotnetNamespace: toDotnetIdentifier(config.name),
+  };
 }
 
 /**

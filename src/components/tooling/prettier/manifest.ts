@@ -7,6 +7,8 @@ export const prettier: Component = {
   category: "tooling",
   label: "Prettier",
   summary: "Opinionated formatter",
+  // Node-only tooling — meaningless (and file-polluting) against a dotnet backend.
+  requires: ["node-runtime"],
   templateDir: join(moduleDir(import.meta.url), "template"),
   node: {
     devDependencies: { prettier: "^3.3.3" },

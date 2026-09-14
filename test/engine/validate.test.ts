@@ -71,6 +71,20 @@ describe("validateSelection", () => {
     expect(res.errors).toEqual([]);
     expect(res.warnings.join()).toMatch(/ignored for the dotnet backend/);
   });
+
+  it("rejects node-only tooling (eslint/prettier) selected against a dotnet backend", () => {
+    const aspnet = comp("aspnet", "backend", { runtime: "dotnet" });
+    const eslint = comp("eslint", "tooling", { requires: ["node-runtime"] });
+    const res = validateSelection(config({ backend: "aspnet" }), [aspnet, eslint]);
+    expect(res.errors.join()).toMatch(/"eslint" requires "node-runtime"/);
+  });
+
+  it("accepts eslint/prettier against a node backend that provides node-runtime", () => {
+    const nestjsNode = comp("nestjs", "backend", { runtime: "node", provides: ["node-runtime"] });
+    const eslint = comp("eslint", "tooling", { requires: ["node-runtime"] });
+    const res = validateSelection(config(), [nestjsNode, eslint]);
+    expect(res.errors).toEqual([]);
+  });
 });
 
 describe("assertValid", () => {

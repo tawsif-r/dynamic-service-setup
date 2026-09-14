@@ -14,7 +14,7 @@ export const nextjs: Component = {
   label: "Next.js",
   summary: "React framework, App Router, standalone output",
   runtime: "node",
-  provides: ["backend-framework", "http-server"],
+  provides: ["backend-framework", "http-server", "node-runtime"],
   templateDir: join(moduleDir(import.meta.url), "template"),
   node: {
     dependencies: {

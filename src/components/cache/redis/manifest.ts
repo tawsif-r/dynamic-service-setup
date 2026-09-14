@@ -12,6 +12,9 @@ export const redis: Component = {
   node: {
     dependencies: { ioredis: "^5.4.1" },
   },
+  dotnet: {
+    packages: { "StackExchange.Redis": "2.8.16" },
+  },
   env: [
     {
       key: "REDIS_URL",
@@ -39,6 +42,8 @@ export const redis: Component = {
     appDependsOn: ["redis"],
   },
   readme:
-    "ioredis client from `REDIS_URL`. NestJS: inject the `@Global()` `RedisService` " +
-    "(`redisService.client`). Next.js: import `redis` from `src/lib/redis.ts`.",
+    "`REDIS_URL` is the Redis connection string. NestJS: inject the `@Global()` " +
+    "`RedisService` (`redisService.client`). Next.js: import `redis` from " +
+    "`src/lib/redis.ts`. ASP.NET: a singleton `IConnectionMultiplexer` is registered " +
+    "in `Program.cs` via `StackExchange.Redis`.",
 };

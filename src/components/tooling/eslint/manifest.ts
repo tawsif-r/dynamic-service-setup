@@ -7,6 +7,8 @@ export const eslint: Component = {
   category: "tooling",
   label: "ESLint",
   summary: "Flat-config lint via typescript-eslint",
+  // Node-only tooling — meaningless (and file-polluting) against a dotnet backend.
+  requires: ["node-runtime"],
   templateDir: join(moduleDir(import.meta.url), "template"),
   node: {
     devDependencies: {

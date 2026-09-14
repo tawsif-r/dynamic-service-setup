@@ -84,6 +84,82 @@ describe("generateProject (v1 slice, no install/git)", () => {
     expect(await read(result.projectDir, "docker-compose.yml")).toMatchSnapshot("docker-compose.yml");
   });
 
+  it("produces the expected file tree and artifacts for an ASP.NET Minimal API + Postgres stack", async () => {
+    const config = resolveConfig({
+      flags: {
+        name: "orders-api",
+        backend: "aspnet-minimal",
+        database: "postgres",
+        cache: "redis",
+        docker: true,
+        install: false,
+        git: false,
+        tooling: [], // no --tooling flag exists yet; the CLI defaults this to [] for dotnet
+      },
+    });
+
+    const result = await generateProject({
+      config,
+      run: { targetDir: tmp.dir, cwd: tmp.dir, dryRun: false, force: false },
+      registry: createRegistry(),
+      logger: silentLogger,
+    });
+
+    expect(result.warnings).toEqual([
+      "package manager 'npm' is ignored for the dotnet backend 'aspnet-minimal'.",
+    ]);
+    expect(result.files).toMatchSnapshot("file tree");
+    expect(result.nextSteps).toEqual([
+      "cd orders-api",
+      "dotnet restore",
+      "docker compose up -d",
+      "dotnet run",
+    ]);
+    // no Node-shaped files leaked in
+    expect(result.files).not.toContain("package.json");
+    expect(result.files).not.toContain(".eslintrc.json");
+
+    expect(await read(result.projectDir, "orders_api.csproj")).toMatchSnapshot("orders_api.csproj");
+    expect(await read(result.projectDir, "Dockerfile")).toMatchSnapshot("Dockerfile");
+    expect(await read(result.projectDir, "Program.cs")).toMatchSnapshot("Program.cs");
+    expect(await read(result.projectDir, "README.md")).toMatchSnapshot("README.md");
+  });
+
+  it("produces the expected file tree and artifacts for an ASP.NET Web API + Mongo stack", async () => {
+    const config = resolveConfig({
+      flags: {
+        name: "catalog-api",
+        backend: "aspnet-webapi",
+        database: "mongodb",
+        docker: true,
+        install: false,
+        git: false,
+        tooling: [],
+      },
+    });
+
+    const result = await generateProject({
+      config,
+      run: { targetDir: tmp.dir, cwd: tmp.dir, dryRun: false, force: false },
+      registry: createRegistry(),
+      logger: silentLogger,
+    });
+
+    expect(result.warnings).toEqual([
+      "package manager 'npm' is ignored for the dotnet backend 'aspnet-webapi'.",
+    ]);
+    expect(result.files).toMatchSnapshot("file tree");
+    expect(result.files).toContain("Controllers/HealthController.cs");
+    // Postgres-only wiring must not leak into a Mongo-backed project
+    expect(result.files).not.toContain("Data/AppDbContext.cs");
+
+    expect(await read(result.projectDir, "catalog_api.csproj")).toMatchSnapshot("catalog_api.csproj");
+    expect(await read(result.projectDir, "Program.cs")).toMatchSnapshot("Program.cs");
+    expect(await read(result.projectDir, "Controllers/HealthController.cs")).toMatchSnapshot(
+      "Controllers/HealthController.cs",
+    );
+  });
+
   it("omits database/cache wiring when neither is selected", async () => {
     const config = resolveConfig({
       flags: {

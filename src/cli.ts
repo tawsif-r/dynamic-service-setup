@@ -89,6 +89,16 @@ export function buildProgram(): Command {
           : { answers: {} as Partial<ProjectConfigInput>, directory: settledDir };
 
         const config = resolveConfig({ preset, flags, answers: prompt.answers });
+
+        // `tooling` defaults to Node-only lint/format components (there's no
+        // --tooling flag or prompt to override it yet) — drop that default for a
+        // dotnet backend so it doesn't ship an .eslintrc/.prettierrc into a C#
+        // project. An explicit tooling choice (from a preset) is left alone.
+        const backendComponent = registry.get(config.backend);
+        if (backendComponent?.runtime === "dotnet" && decided.tooling === undefined) {
+          config.tooling = [];
+        }
+
         const { targetDir } = resolveTarget(name, prompt.directory ?? options.dir, cwd);
 
         const result = await generateProject({

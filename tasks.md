@@ -132,8 +132,105 @@ Goal: prove the engine on a second backend/database combo with no engine reshapi
 
 ---
 
+## Phase 3 — ASP.NET Core backends (Minimal API + Web API)
+
+Goal: prove the engine on a third runtime (`dotnet`) with two real, selectable
+backend templates — same shape as NestJS/Next.js being two selectable node
+backends, not a single backend with a hidden sub-choice.
+
+### T16 — dotnet engine plumbing ✅
+- [x] `src/util/dotnet-identifier.ts` — `toDotnetIdentifier(name)`, the single
+      sanitizer for the `.csproj` filename, `RootNamespace`/`AssemblyName`, and the
+      Dockerfile `ENTRYPOINT`
+- [x] `src/engine/render.ts` — `RenderContext` gains `dotnetNamespace`
+      (precomputed `toDotnetIdentifier(config.name)`) so dotnet `.ejs` templates
+      match what the merger emits
+- [x] `src/components/types.ts` — `DotnetContribution` gains `sdk?` (backend-only,
+      `<Project Sdk="...">`)
+- [x] `src/engine/merge-csproj.ts` implemented: project shell
+      (SDK/TargetFramework/Nullable/ImplicitUsings/RootNamespace/AssemblyName) +
+      union of every selected component's `dotnet.packages` as
+      `<PackageReference>`, mirroring `merge-package-json`'s
+      collision-warns-keeps-first policy
+- [x] `src/engine/merge-dockerfile.ts` split into `buildNodeDockerfile` /
+      `buildDotnetDockerfile`; the dotnet path is a
+      `mcr.microsoft.com/dotnet/sdk:10.0` build stage (`dotnet restore` +
+      `dotnet publish`) → `mcr.microsoft.com/dotnet/aspnet:10.0` runtime stage
+- [x] `src/engine/assemble-readme.ts` — dotnet-aware "Getting started"
+      (`dotnet restore`/`dotnet run`) and drops the "Package manager" stack line
+      for a dotnet backend
+- [x] `src/generate.ts` — `buildNextSteps()` branches on the resolved backend's
+      `runtime`; `runPostGenerate` now receives that `runtime` instead of
+      `post-generate.ts` string-matching `config.backend !== "aspnet"` (a dead
+      check — no `aspnet` id had ever been registered)
+- [x] `src/exec/post-generate.ts` — added the `dotnet restore` step (parallel to
+      `pm.install`, same non-fatal try/catch pattern)
+- [x] Verified: `npm run typecheck` clean, `npm test` green
+
+### T17 — Two ASP.NET Core backend components ✅
+- [x] `backend/aspnet-minimal/` — top-level-statements `Program.cs.ejs`,
+      `has('postgres')`/`has('mongodb')`/`has('redis')` wiring (EF Core+Npgsql /
+      native `IMongoClient` / `IConnectionMultiplexer`), `Data/AppDbContext.cs.ejs`
+      (only when `has('postgres')`), `appsettings*.json`,
+      `Properties/launchSettings.json` (port 3000)
+- [x] `backend/aspnet-webapi/` — same wiring, plus `AddControllers()` /
+      `MapControllers()` and a `Controllers/HealthController.cs.ejs`
+      `[ApiController]`
+- [x] Both `provides: ["backend-framework", "http-server"]`, `runtime: "dotnet"`;
+      health endpoint returns `{"status":"ok","uptime":...}` on port 3000 (matches
+      the NestJS/Next.js smoke-test shape)
+- [x] `database/postgres`, `database/mongodb`, `cache/redis` manifests gained
+      `dotnet.packages` (`Npgsql.EntityFrameworkCore.PostgreSQL`, `MongoDB.Driver`
+      — pinned to the 3.x line, since 2.x carries known-vulnerable transitive
+      `SharpCompress`/`Snappier` deps (NU1902/NU1903) — `StackExchange.Redis`),
+      backend-agnostic like their existing `node.dependencies`; their `readme`
+      text updated to describe both the Node and ASP.NET wiring
+- [x] Registered in `src/components/index.ts`
+- [x] Verified end-to-end (`dotnet` 10.0.400 SDK was available in this
+      environment): `dotnet build` succeeded — 0 warnings, 0 errors — for
+      `aspnet-minimal`+postgres+redis and `aspnet-webapi`+mongodb+redis;
+      `dotnet run` served `GET /` → `{"status":"ok","uptime":0}`. Containerized
+      `docker compose up --build` was not re-verified (no Docker daemon in this
+      environment) — same caveat as T11.
+
+### T18 — Default-tooling fix for dotnet ✅
+- [x] `tooling` has no CLI flag or prompt yet, so its only input besides a preset
+      is the schema default `["eslint", "prettier"]` — which would otherwise ship
+      dead lint/format config into every dotnet project. `src/cli.ts` now zeroes
+      `config.tooling` for a dotnet backend when it wasn't explicitly set.
+- [x] Safety net: `eslint`/`prettier` gained `requires: ["node-runtime"]`;
+      `nestjs`/`nextjs` gained `provides: [..., "node-runtime"]` — an explicit
+      (e.g. preset-forced) combination now fails validation with a readable error
+      instead of silently shipping the files.
+- [x] `tooling/git/template/_gitignore` and `infra/docker/template/_dockerignore`
+      gained `bin/`/`obj/`/`*.user` (inert for Node, needed for dotnet — both are
+      single shared files, not gated by runtime)
+- [x] Verified: `create-app app --backend aspnet-minimal -y` (defaults) emits no
+      `.eslintrc`/`eslint.config.mjs`/`.prettierrc`
+
+### T19 — Tests + docs ✅
+- [x] `test/engine/merge.test.ts` — real `mergeCsproj` coverage (shell, package
+      union, version-clash warning) replacing the old "throws" stub test; new
+      `mergeDockerfile`/`assembleReadme` dotnet-branch tests
+- [x] `test/engine/validate.test.ts` — `node-runtime` requires/provides coverage
+- [x] `test/components.test.ts` — select/validate coverage for both dotnet
+      backends × {postgres, mongodb} + redis
+- [x] `test/snapshot.test.ts` — two new fixtures (`aspnet-minimal`+postgres+
+      redis+docker, `aspnet-webapi`+mongodb+docker); `npx vitest run -u` reviewed
+- [x] `README.md` — new **Backends** section (table + examples) covering all four
+      backends; the smoke-test section gained the dotnet equivalent
+- [x] `docs/development.md`, `docs/adding-a-component.md`, `docs/contributing.md`
+      updated to reflect the real (non-stub) dotnet path
+- [x] Verified: `npm test` (75 passing), `npm run typecheck` clean
+
+**Phase 3 done ✅** — third runtime (`dotnet`), two real selectable backend
+templates, no engine reshaping beyond the plumbing `merge-csproj.ts` was already
+stubbed for. MVC/Blazor/Worker Service remain future backends (see P4).
+
+---
+
 ## Later phases (not started)
 
-- **P3**: ASP.NET backend + `merge-csproj.ts` implementation
-- **P4**: preset files end-to-end, CI/husky/commitlint tooling components
+- **P4**: additional dotnet backend templates (MVC, Blazor, Worker Service),
+  preset files end-to-end, CI/husky/commitlint tooling components
 - **P5**: user component dir `~/.config/create-app/components/`

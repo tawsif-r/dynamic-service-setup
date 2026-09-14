@@ -63,4 +63,21 @@ describe("built-in components", () => {
       expect(validateSelection(config, selected).errors).toEqual([]);
     }
   });
+
+  it("selects and validates each dotnet backend with each database + redis", () => {
+    for (const backend of ["aspnet-minimal", "aspnet-webapi"]) {
+      for (const database of ["postgres", "mongodb"]) {
+        const config = resolveConfig({
+          flags: { name: "orders-api", backend, database, cache: "redis", docker: true, tooling: [] },
+        });
+        const selected = createRegistry().select(config);
+        expect(selected.map((c) => c.id)).toEqual(
+          expect.arrayContaining([backend, database, "redis", "docker", "docker-compose"]),
+        );
+        // eslint/prettier are Node-only — confirm they aren't dragged in by default.
+        expect(selected.map((c) => c.id)).not.toEqual(expect.arrayContaining(["eslint", "prettier"]));
+        expect(validateSelection(config, selected).errors).toEqual([]);
+      }
+    }
+  });
 });
