@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import type { ProjectConfig, RunOptions } from "./config/schema.js";
+import type { Runtime } from "./components/types.js";
 import { Registry, createRegistry } from "./registry.js";
 import { assertValid } from "./engine/validate.js";
 import { makeRenderContext, renderTemplateDir } from "./engine/render.js";
@@ -34,9 +35,15 @@ export type GenerateResult = {
   dryRun: boolean;
 };
 
-function buildNextSteps(config: ProjectConfig, cdTarget: string): string[] {
-  const pm = config.packageManager;
+function buildNextSteps(config: ProjectConfig, cdTarget: string, backendRuntime: Runtime): string[] {
   const steps = [`cd ${cdTarget}`];
+  if (backendRuntime === "dotnet") {
+    if (!config.install) steps.push("dotnet restore");
+    if (config.docker) steps.push("docker compose up -d");
+    steps.push("dotnet run");
+    return steps;
+  }
+  const pm = config.packageManager;
   if (!config.install) steps.push(`${pm} install`);
   if (config.docker) steps.push("docker compose up -d");
   steps.push(`${pm} run start:dev`);
@@ -128,17 +135,19 @@ export async function generateProject(input: GenerateInput): Promise<GenerateRes
     throw err;
   }
 
+  const backendRuntime: Runtime = selected.find((c) => c.category === "backend")?.runtime ?? "node";
+
   const commands = selected.flatMap(
     (c) => c.postGenerate?.({ config, components: selected }) ?? [],
   );
-  await runPostGenerate({ projectDir, config, commands, logger });
+  await runPostGenerate({ projectDir, config, commands, logger, runtime: backendRuntime });
 
   return {
     projectDir,
     location: cdTarget,
     files: written,
     warnings,
-    nextSteps: buildNextSteps(config, cdTarget),
+    nextSteps: buildNextSteps(config, cdTarget, backendRuntime),
     dryRun: false,
   };
 }

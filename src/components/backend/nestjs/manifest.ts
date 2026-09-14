@@ -8,7 +8,7 @@ export const nestjs: Component = {
   label: "NestJS",
   summary: "Progressive Node.js framework (TypeScript, Express)",
   runtime: "node",
-  provides: ["backend-framework", "http-server"],
+  provides: ["backend-framework", "http-server", "node-runtime"],
   templateDir: join(moduleDir(import.meta.url), "template"),
   node: {
     dependencies: {

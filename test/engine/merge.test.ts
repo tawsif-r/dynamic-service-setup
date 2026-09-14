@@ -76,6 +76,14 @@ const rabbitmq: Component = {
 const dockerComposeComp: Component = { id: "docker-compose", category: "infra", label: "Docker Compose" };
 const dockerComp: Component = { id: "docker", category: "infra", label: "Docker" };
 
+const aspnet: Component = {
+  id: "aspnet-minimal",
+  category: "backend",
+  label: "ASP.NET Core (Minimal API)",
+  runtime: "dotnet",
+  dotnet: { sdk: "Microsoft.NET.Sdk.Web" },
+};
+
 describe("mergePackageJson", () => {
   it("unions deps/devDeps/scripts and sorts keys", () => {
     const { files } = mergePackageJson(config(), [nestjs, postgres, redis]);
@@ -105,8 +113,7 @@ describe("mergePackageJson", () => {
   });
 
   it("emits nothing for a non-node backend", () => {
-    const aspnet: Component = { id: "aspnet", category: "backend", label: "ASP.NET", runtime: "dotnet" };
-    expect(mergePackageJson(config({ backend: "aspnet" }), [aspnet]).files).toEqual([]);
+    expect(mergePackageJson(config({ backend: "aspnet-minimal" }), [aspnet]).files).toEqual([]);
   });
 
   it("applies a combo contribution only when its `when` ids are all selected", () => {
@@ -226,6 +233,18 @@ describe("mergeDockerfile", () => {
   it("returns nothing without the docker component", () => {
     expect(mergeDockerfile(config({ docker: false }), [nestjs]).files).toEqual([]);
   });
+
+  it("emits a dotnet SDK/runtime multi-stage Dockerfile for a dotnet backend", () => {
+    const { files } = mergeDockerfile(config({ backend: "aspnet-minimal", docker: true }), [aspnet, dockerComp]);
+    const text = files[0]!.contents as string;
+    expect(text).toContain("FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build");
+    expect(text).toContain("RUN dotnet restore");
+    expect(text).toContain("RUN dotnet publish -c Release -o /app/publish");
+    expect(text).toContain("FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime");
+    expect(text).toContain("ENV ASPNETCORE_URLS=http://+:3000");
+    expect(text).toContain('ENTRYPOINT ["dotnet", "voting_app.dll"]');
+    expect(text).toContain("EXPOSE 3000");
+  });
 });
 
 describe("assembleReadme", () => {
@@ -239,15 +258,52 @@ describe("assembleReadme", () => {
     expect(text).toContain("docker compose up -d");
     expect(text).toContain("pnpm start:dev");
   });
+
+  it("uses dotnet commands and omits the package manager line for a dotnet backend", () => {
+    const { files } = assembleReadme(config({ backend: "aspnet-minimal", docker: true }), [aspnet]);
+    const text = files[0]!.contents as string;
+    expect(text).toContain("dotnet restore");
+    expect(text).toContain("dotnet run");
+    expect(text).not.toContain("**Package manager:**");
+  });
 });
 
 describe("mergeCsproj", () => {
   it("is a no-op for node backends", () => {
     expect(mergeCsproj(config(), [nestjs]).files).toEqual([]);
   });
-  it("throws for dotnet until Phase 3", () => {
-    const aspnet: Component = { id: "aspnet", category: "backend", label: "ASP.NET", runtime: "dotnet" };
-    expect(() => mergeCsproj(config({ backend: "aspnet" }), [aspnet])).toThrowError(/not implemented yet/);
+
+  it("emits a project shell named after the sanitized project name", () => {
+    const { files } = mergeCsproj(config({ backend: "aspnet-minimal" }), [aspnet]);
+    expect(files).toHaveLength(1);
+    expect(files[0]!.path).toBe("voting_app.csproj");
+    const text = files[0]!.contents as string;
+    expect(text).toContain('<Project Sdk="Microsoft.NET.Sdk.Web">');
+    expect(text).toContain("<TargetFramework>net10.0</TargetFramework>");
+    expect(text).toContain("<RootNamespace>voting_app</RootNamespace>");
+    expect(text).toContain("<AssemblyName>voting_app</AssemblyName>");
+    expect(text).not.toContain("<ItemGroup>");
+  });
+
+  it("unions dotnet.packages from every selected component", () => {
+    const pg: Component = {
+      ...postgres,
+      dotnet: { packages: { "Npgsql.EntityFrameworkCore.PostgreSQL": "8.0.10" } },
+    };
+    const { files } = mergeCsproj(config({ backend: "aspnet-minimal" }), [aspnet, pg]);
+    const text = files[0]!.contents as string;
+    expect(text).toContain(
+      '<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />',
+    );
+  });
+
+  it("warns on a conflicting package version and keeps the first", () => {
+    const a: Component = { id: "a", category: "tooling", label: "a", dotnet: { packages: { "Foo.Bar": "1.0.0" } } };
+    const b: Component = { id: "b", category: "tooling", label: "b", dotnet: { packages: { "Foo.Bar": "2.0.0" } } };
+    const { files, warnings } = mergeCsproj(config({ backend: "aspnet-minimal" }), [aspnet, a, b]);
+    const text = files[0]!.contents as string;
+    expect(text).toContain('Version="1.0.0"');
+    expect(warnings.join()).toMatch(/NuGet package "Foo\.Bar".*keeping 1\.0\.0/);
   });
 });
 

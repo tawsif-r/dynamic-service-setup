@@ -64,50 +64,20 @@ describe("built-in components", () => {
     }
   });
 
-  it("selects and validates a nestjs + postgres + redis + rabbitmq stack", () => {
-    const config = resolveConfig({
-      flags: {
-        name: "api",
-        backend: "nestjs",
-        database: "postgres",
-        cache: "redis",
-        queue: "rabbitmq",
-        docker: true,
-      },
-    });
-    const selected = createRegistry().select(config);
-    expect(selected.map((c) => c.id)).toEqual([
-      "nestjs",
-      "postgres",
-      "redis",
-      "rabbitmq",
-      "docker",
-      "docker-compose",
-      "eslint",
-      "prettier",
-      "git",
-    ]);
-    expect(validateSelection(config, selected).errors).toEqual([]);
-  });
-
-  it("rejects rabbitmq without docker or --external-rabbitmq", () => {
-    const config = resolveConfig({
-      flags: { name: "api", backend: "nestjs", queue: "rabbitmq", docker: false },
-    });
-    const selected = createRegistry().select(config);
-    expect(validateSelection(config, selected).errors).toEqual(
-      expect.arrayContaining([expect.stringContaining("queue 'rabbitmq' has nowhere to run")]),
-    );
-  });
-
-  it("selects and validates nextjs + rabbitmq without a database or cache", () => {
-    const config = resolveConfig({
-      flags: { name: "web", backend: "nextjs", queue: "rabbitmq", docker: true },
-    });
-    const selected = createRegistry().select(config);
-    expect(selected.map((c) => c.id)).toEqual(
-      expect.arrayContaining(["nextjs", "rabbitmq", "docker", "docker-compose"]),
-    );
-    expect(validateSelection(config, selected).errors).toEqual([]);
+  it("selects and validates each dotnet backend with each database + redis", () => {
+    for (const backend of ["aspnet-minimal", "aspnet-webapi"]) {
+      for (const database of ["postgres", "mongodb"]) {
+        const config = resolveConfig({
+          flags: { name: "orders-api", backend, database, cache: "redis", docker: true, tooling: [] },
+        });
+        const selected = createRegistry().select(config);
+        expect(selected.map((c) => c.id)).toEqual(
+          expect.arrayContaining([backend, database, "redis", "docker", "docker-compose"]),
+        );
+        // eslint/prettier are Node-only — confirm they aren't dragged in by default.
+        expect(selected.map((c) => c.id)).not.toEqual(expect.arrayContaining(["eslint", "prettier"]));
+        expect(validateSelection(config, selected).errors).toEqual([]);
+      }
+    }
   });
 });

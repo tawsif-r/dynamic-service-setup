@@ -1,6 +1,8 @@
 import type { Component } from "./types.js";
 import { nestjs } from "./backend/nestjs/manifest.js";
 import { nextjs } from "./backend/nextjs/manifest.js";
+import { aspnetMinimal } from "./backend/aspnet-minimal/manifest.js";
+import { aspnetWebapi } from "./backend/aspnet-webapi/manifest.js";
 import { postgres } from "./database/postgres/manifest.js";
 import { mongodb } from "./database/mongodb/manifest.js";
 import { redis } from "./cache/redis/manifest.js";
@@ -18,6 +20,8 @@ import { git } from "./tooling/git/manifest.js";
 export const builtinComponents: Component[] = [
   nestjs,
   nextjs,
+  aspnetMinimal,
+  aspnetWebapi,
   postgres,
   mongodb,
   redis,

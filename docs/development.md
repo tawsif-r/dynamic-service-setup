@@ -100,7 +100,7 @@ Prompts ──┘                                                          │
                     ┌───────────────────────────────────────────────┼───────────────────────────┐
                     ▼                     ▼                          ▼                            ▼
               render templates      merge package.json         merge compose             merge .env / Dockerfile
-              (EJS + config)        / .csproj (stub)           (YAML AST)                / assemble README
+              (EJS + config)        / .csproj                  (YAML AST)                / assemble README
                     └───────────────────────────────────────────────┼───────────────────────────┘
                                                                     ▼
                                                        one FileMap  →  write to temp dir
@@ -136,7 +136,7 @@ config resolution.
 4. **Compose files** (`composeFiles()` in `src/generate.ts`, pure):
    - render every selected component's `templateDir` through EJS
      (`renderTemplateDir` in `src/engine/render.ts`) into a `FileMap`;
-   - run every merger — `mergePackageJson`, `mergeCsproj` (stub), `mergeCompose`,
+   - run every merger — `mergePackageJson`, `mergeCsproj`, `mergeCompose`,
      `mergeEnv`, `mergeDockerfile`, `assembleReadme` — and overlay their files on
      top (merger output wins over templates on a path collision).
 5. **Write + move** (`src/exec/write-files.ts`, `src/util/fs.ts`) — write the
@@ -146,9 +146,11 @@ config resolution.
    half-written project. `--force` removes an existing target first; `--dry-run`
    stops here and just prints the plan.
 6. **Post-generate** (`src/exec/post-generate.ts`) — in order: component
-   `postGenerate` hook commands → dependency install (`src/exec/package-manager.ts`)
-   → `git init` + identity fallback + initial commit → `prettier --write` if the
-   `prettier` tooling component is present. Each step is individually non-fatal
+   `postGenerate` hook commands → dependency install (`<pm> install` for a node
+   backend, `dotnet restore` for a dotnet one — selected by the `runtime`
+   `generate.ts` passes in, not by string-matching `config.backend`) → `git init` +
+   identity fallback + initial commit → `prettier --write` if the `prettier`
+   tooling component is present (node only). Each step is individually non-fatal
    where a failure should not abandon a project that is otherwise written.
 7. **Report** — `GenerateResult` carries the file list, warnings, and the
    `Next:` steps the CLI prints.
@@ -178,13 +180,18 @@ src/
 │   ├── index.ts               builtinComponents — EXPLICIT import list
 │   ├── backend/nestjs/        manifest.ts + template/
 │   ├── backend/nextjs/        manifest.ts + template/
-│   ├── database/postgres/     manifest.ts (no template — wired via app.module)
+│   ├── backend/aspnet-minimal/ manifest.ts + template/ (top-level Program.cs)
+│   ├── backend/aspnet-webapi/  manifest.ts + template/ (Controllers/)
+│   ├── database/postgres/     manifest.ts (no template — wired via app.module /
+│   │                          Program.cs)
 │   ├── database/mongodb/      manifest.ts
 │   ├── cache/redis/           manifest.ts + template/ (Nest-shaped, has('nestjs'))
 │   ├── queue/rabbitmq/        manifest.ts + template/ (Nest-shaped, has('nestjs'))
 │   ├── infra/docker/          manifest.ts + template/_dockerignore
 │   ├── infra/docker-compose/  manifest.ts — supplies the base `app` service
-│   └── tooling/{eslint,prettier,git}/  manifest.ts + template/
+│   └── tooling/{eslint,prettier,git}/  manifest.ts + template/ (eslint/prettier
+│                              `requires: ["node-runtime"]` — rejected against a
+│                              dotnet backend rather than shipping dead config)
 │
 ├── engine/                    ← composition. Every module here is PURE.
 │   ├── validate.ts            validateSelection / assertValid
@@ -194,8 +201,9 @@ src/
 │   ├── merge-package-json.ts  node backends: union of node.* + combos
 │   ├── merge-compose.ts       docker-compose.yml as a YAML AST
 │   ├── merge-env.ts           .env + .env.example, grouped by component
-│   ├── merge-dockerfile.ts    pm-aware Node multi-stage Dockerfile
-│   ├── merge-csproj.ts        STUB — dotnet, Phase 3
+│   ├── merge-dockerfile.ts    pm-aware Node multi-stage Dockerfile, or a dotnet
+│   │                          SDK/runtime multi-stage Dockerfile
+│   ├── merge-csproj.ts        dotnet backends: project shell + dotnet.* union
 │   └── assemble-readme.ts     README.md: stack list + component sections
 │
 ├── exec/                      ← the only layer that does I/O
@@ -207,6 +215,10 @@ src/
     ├── target.ts              resolveTarget — [name] + --dir → { projectName, targetDir }
     ├── fs.ts                  pathExists, isDirEmpty, ensureDir, moveDir (EXDEV-safe)
     ├── dir.ts                 moduleDir(import.meta.url) — for templateDir paths
+    ├── dotnet-identifier.ts   toDotnetIdentifier(name) — C#-safe RootNamespace/
+    │                          AssemblyName/.csproj filename, shared by
+    │                          merge-csproj.ts, merge-dockerfile.ts and every
+    │                          dotnet .ejs template (as `dotnetNamespace`)
     └── logger.ts              consoleLogger / silentLogger
 
 scripts/copy-templates.mjs     build step: copy every src/**/template/ → dist/
@@ -237,12 +249,12 @@ A composable unit. The fields the engine reads:
 | Field | Consumed by | Purpose |
 |---|---|---|
 | `id`, `category`, `label`, `summary` | registry, prompts | identity + menu display |
-| `runtime` (`"node" \| "dotnet"`) | `merge-package-json`, `merge-dockerfile`, `merge-csproj` | which mergers apply; backends declare it |
+| `runtime` (`"node" \| "dotnet"`) | `merge-package-json`, `merge-dockerfile`, `merge-csproj`, `post-generate.ts` | which mergers/post-generate steps apply; backends declare it |
 | `unavailable` | registry | stub marker — not selectable, shown with this reason |
-| `requires`, `conflicts`, `provides` | `validate.ts` | relationships; tokens are ids or capability tags |
+| `requires`, `conflicts`, `provides` | `validate.ts` | relationships; tokens are ids or capability tags (e.g. `node-runtime`, provided by node backends and required by eslint/prettier) |
 | `templateDir` | `render.ts` | absolute path to a folder of EJS/plain files |
 | `node` | `merge-package-json` | `dependencies` / `devDependencies` / `scripts` |
-| `dotnet` | `merge-csproj` (stub) | `packages` |
+| `dotnet` | `merge-csproj` | `packages`; `sdk` (backend only, e.g. `Microsoft.NET.Sdk.Web`) |
 | `env` | `merge-env` | `{ key, value, comment? }[]` → `.env` + `.env.example` |
 | `compose` | `merge-compose` | `services`, `volumes`, `appDependsOn` |
 | `dockerfile` | `merge-dockerfile` | `stages[]` (anchored lines), `cmd`, `runtimeStage` |
@@ -292,9 +304,9 @@ Implemented in `src/engine/render.ts`. Every file under a component's
 | `package.json` | `merge-package-json.ts` | `runtime: "node"` backends only. Base metadata (`name`, `version`, `private`) + union of every selected component's `node.dependencies` / `devDependencies` / `scripts`, plus any `combos` whose `when` ids are all selected. Conflicting version specs → **warning, first spec kept**. Keys sorted. No template. |
 | `docker-compose.yml` | `merge-compose.ts` | Only when `docker-compose` is selected. Base `{ services: { app } }` from the `infra/docker-compose` manifest; for every component deep-merge `compose.services` / `compose.volumes` by name and append `compose.appDependsOn` to `services.app.depends_on` (deduped, sorted). Serialised with the `yaml` package — **never string glue**. |
 | `.env` / `.env.example` | `merge-env.ts` | Union of every `env` entry, deduped by key (**first component to declare a key wins**; a differing later value → warning), grouped under a `# --- <component id> ---` header. v1 keeps the two files identical (dev defaults, not secrets). |
-| `Dockerfile` | `merge-dockerfile.ts` | Only when `docker` is selected, `runtime: "node"` only (dotnet → warning). A multi-stage `node:22-alpine` build parameterised by `packageManager` (lockfile name, install command). Components inject lines via `dockerfile.stages` anchored at `prelude \| deps \| build \| runtime`. The runtime `CMD` and the runtime-stage `COPY` lines default to a `tsc` `dist/` layout; a backend overrides via `dockerfile.cmd` / `dockerfile.runtimeStage` (Next.js → standalone `server.js`). |
-| `README.md` | `assemble-readme.ts` | Always emitted. Title + "no runtime dependency on the generator" note + a **Stack** list + one `### <label>` section per component that sets `readme` + a generated **Getting started** block. |
-| `.csproj` | `merge-csproj.ts` | **Stub.** No-op for node; throws for dotnet. Phase 3 will union `dotnet.packages` into `<PackageReference>` entries, mirroring `merge-package-json`. |
+| `Dockerfile` | `merge-dockerfile.ts` | Only when `docker` is selected. Dispatches on `backend.runtime`: for `"node"`, a multi-stage `node:22-alpine` build parameterised by `packageManager` (lockfile name, install command) — the runtime `CMD` and runtime-stage `COPY` lines default to a `tsc` `dist/` layout, a backend overrides via `dockerfile.cmd` / `dockerfile.runtimeStage` (Next.js → standalone `server.js`); for `"dotnet"`, a `mcr.microsoft.com/dotnet/sdk` build stage (`dotnet restore` + `dotnet publish`) → `mcr.microsoft.com/dotnet/aspnet` runtime stage, `ENTRYPOINT ["dotnet", "<ident>.dll"]` (`<ident>` from `util/dotnet-identifier.ts`, same value `merge-csproj.ts` uses). Both paths accept `dockerfile.stages` injection at `prelude \| deps \| build \| runtime`. |
+| `README.md` | `assemble-readme.ts` | Always emitted. Title + "no runtime dependency on the generator" note + a **Stack** list + one `### <label>` section per component that sets `readme` + a generated **Getting started** block. The "Package manager" stack line and the install/run commands in "Getting started" are dotnet-aware (`dotnet restore` / `dotnet run`, no package-manager line) when `backend.runtime === "dotnet"`. |
+| `.csproj` | `merge-csproj.ts` | `runtime: "dotnet"` backends only (no-op for node). A project shell (`<Project Sdk="...">`, `TargetFramework`, `Nullable`/`ImplicitUsings`, `RootNamespace`/`AssemblyName` from `util/dotnet-identifier.ts`) plus the union of every selected component's `dotnet.packages` as `<PackageReference>` entries, mirroring `merge-package-json`'s version-collision-warns-and-keeps-first policy. |
 
 ---
 
@@ -304,17 +316,25 @@ There is **no shared "wire the database in" step**. Each backend owns how a
 database/cache connects:
 
 - **NestJS** — `backend/nestjs/template/src/app.module.ts.ejs` has `has('postgres')`
-  / `has('mongodb')` / `has('redis')` / `has('rabbitmq')` branches that conditionally
-  add `TypeOrmModule.forRoot(...)`, `MongooseModule.forRoot(...)`, `RedisModule`,
-  `RabbitmqModule`. The framework glue package (`@nestjs/typeorm`, `@nestjs/mongoose`)
-  is a **`combos` entry on the `nestjs` manifest**, keyed on the database id — so the
-  database manifests carry only backend-agnostic deps (`pg`, `typeorm`, `mongoose`).
-- **Next.js** — no central module, so `backend/nextjs/template/src/lib/db.ts.ejs`,
-  `redis.ts.ejs` and `rabbitmq.ts.ejs` are singletons that render to nothing
-  (→ dropped) unless the matching component is selected.
-- **Cross-backend contamination guard** — `cache/redis/template/` and
-  `queue/rabbitmq/template/` files are `.ejs` gated on `has('nestjs')` so the
-  Nest-shaped `RedisModule`/`RedisService`/`RabbitmqModule`/`RabbitmqService` don't
+  / `has('mongodb')` / `has('redis')` branches that conditionally add
+  `TypeOrmModule.forRoot(...)`, `MongooseModule.forRoot(...)`, `RedisModule`. The
+  framework glue package (`@nestjs/typeorm`, `@nestjs/mongoose`) is a **`combos`
+  entry on the `nestjs` manifest**, keyed on the database id — so the database
+  manifests carry only backend-agnostic deps (`pg`, `typeorm`, `mongoose`).
+- **Next.js** — no central module, so `backend/nextjs/template/src/lib/db.ts.ejs`
+  and `redis.ts.ejs` are singletons that render to nothing (→ dropped) unless the
+  matching component is selected.
+- **ASP.NET Core** (`aspnet-minimal`, `aspnet-webapi`) — same central-file pattern
+  as NestJS: `Program.cs.ejs` has `has('postgres')` / `has('mongodb')` /
+  `has('redis')` branches registering `AddDbContext<AppDbContext>` (EF Core +
+  Npgsql), a singleton `IMongoClient`, or a singleton `IConnectionMultiplexer`.
+  `Data/AppDbContext.cs.ejs` renders (and its `DbContext` subclass exists) only
+  when `has('postgres')`. The NuGet packages themselves live on the database/cache
+  manifests (`dotnet.packages`, mirroring where `pg`/`mongoose`/`ioredis` live on
+  `node.dependencies`) rather than as backend `combos` — ASP.NET's built-in DI
+  needs no extra glue package the way `@nestjs/typeorm` does.
+- **Cross-backend contamination guard** — `cache/redis/template/` files are `.ejs`
+  gated on `has('nestjs')` so the Nest-shaped `RedisModule`/`RedisService` don't
   leak into a Next.js project. `tooling/eslint`'s config is `.ejs` that adds
   `.next/**` to `ignores` only when `has('nextjs')`.
 
@@ -363,8 +383,12 @@ The published package ships only `bin/` and `dist/` (`package.json#files`).
 - **The staging dir** is created as a sibling of the target for an atomic rename;
   it falls back to the OS temp dir (then copy+rm) if that fails. Don't assume the
   project is built in place.
-- **`merge-csproj.ts` throws** for a `runtime: "dotnet"` backend — that path is
-  Phase 3 and intentionally unfinished.
+- **`tooling` has no CLI flag or prompt yet** — its only inputs are a preset or the
+  schema default (`["eslint", "prettier"]`). `cli.ts` overrides that default to
+  `[]` for a dotnet backend (right after `resolveConfig()`, checking
+  `decided.tooling === undefined`) so a dotnet project doesn't get Node-only lint
+  config by default; `eslint`/`prettier`'s `requires: ["node-runtime"]` is the
+  safety net if a preset forces them on anyway.
 - **`docker compose up -d --build` from inside some sandboxes hangs** on
   `npm install` reaching the registry from a build container (see `tasks.md` T11).
   It is not a `create-app` bug — run the containerised smoke on a normal machine.

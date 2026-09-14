@@ -190,17 +190,26 @@ it — but note the CLI has no `--tooling` flag yet (see
 
 A backend is the most involved component. Requirements:
 
-1. **`runtime`** — `"node"` (works today) or `"dotnet"` (Phase 3, `merge-csproj`
-   still a stub — don't).
+1. **`runtime`** — `"node"` or `"dotnet"`; both work today. A `"node"` backend
+   goes through `merge-package-json`/the Node `merge-dockerfile` path (see below);
+   a `"dotnet"` backend goes through `merge-csproj`/the dotnet `merge-dockerfile`
+   path — see `backend/aspnet-minimal/` and `backend/aspnet-webapi/` for a worked
+   example of the latter.
 2. **`provides: ["backend-framework", "http-server"]`** so validation knows a
-   backend is present.
+   backend is present. A `"node"` backend should also provide `"node-runtime"` if
+   it wants `eslint`/`prettier` selectable (they `require` it).
 3. **`templateDir`** with at least a working app skeleton and an HTTP health
    endpoint on port 3000 (the compose `app` service and the Dockerfile `EXPOSE`
    assume 3000).
-4. **`node.scripts`** must define `build` and `start:dev` — `generate.ts`'s
-   `buildNextSteps()` prints `<pm> run start:dev`, and `merge-dockerfile` runs
-   `<pm> run build`. (Next.js aliases `start:dev` → `next dev` for exactly this.)
-5. **Dockerfile overrides** if the build output isn't a `tsc`-style `dist/`:
+4. **Node backends**: `node.scripts` must define `build` and `start:dev` —
+   `generate.ts`'s `buildNextSteps()` prints `<pm> run start:dev`, and
+   `merge-dockerfile` runs `<pm> run build`. (Next.js aliases `start:dev` →
+   `next dev` for exactly this.) **Dotnet backends** need no script-equivalent —
+   `dotnet restore`/`dotnet build`/`dotnet run` are fixed commands, not
+   per-project scripts; `dotnet.sdk` (default `Microsoft.NET.Sdk.Web`) is the only
+   thing a dotnet backend typically sets.
+5. **Dockerfile overrides** if a node backend's build output isn't a `tsc`-style
+   `dist/`:
    ```ts
    dockerfile: {
      cmd: ["node", "server.js"],
@@ -211,11 +220,16 @@ A backend is the most involved component. Requirements:
      ],
    },
    ```
-6. **Own your DB/cache wiring** — either `has(...)` branches in a central template
-   file (NestJS) or per-client singleton `.ejs` files that render empty when the
-   component isn't picked (Next.js). See
-   [development.md](development.md#backend-specific-wiring).
-7. **`combos`** for any framework-specific glue packages, keyed on the database id.
+   Dotnet backends generally don't need this override — `merge-dockerfile.ts`
+   computes the `ENTRYPOINT` from `util/dotnet-identifier.ts` automatically.
+6. **Own your DB/cache wiring** — `has(...)` branches in a central template file
+   (NestJS's `app.module.ts.ejs`, ASP.NET's `Program.cs.ejs`) or per-client
+   singleton `.ejs` files that render empty when the component isn't picked
+   (Next.js). See [development.md](development.md#backend-specific-wiring).
+7. **`combos`** for any framework-specific glue packages, keyed on the database
+   id (Node only today — `ComboContribution` has no `dotnet` field yet; a dotnet
+   backend needing DB-specific NuGet glue would add one, additively, the same way
+   Phase 2 added the `node` field).
 8. Guard against **cross-backend contamination**: if another component ships
    backend-shaped template files (like `cache/redis`), gate them with
    `has('<your-backend>')` or `has('nestjs')` as appropriate.
@@ -280,12 +294,12 @@ Set `unavailable` to a reason string. The registry filters it out of prompt menu
 and throws a readable error if it's selected by flag:
 
 ```ts
-export const aspnet: Component = {
-  id: "aspnet",
+export const blazorServer: Component = {
+  id: "blazor-server",
   category: "backend",
-  label: "ASP.NET",
+  label: "Blazor Server",
   runtime: "dotnet",
-  unavailable: "planned for Phase 3 — see tasks.md",
+  unavailable: "planned — see tasks.md",
 };
 ```
 

@@ -52,6 +52,8 @@ export type NodeContribution = {
 
 export type DotnetContribution = {
   packages?: Record<string, string>;
+  /** `<Project Sdk="...">` — only meaningful on the backend component */
+  sdk?: string;
 };
 
 export type DockerfileStage = {

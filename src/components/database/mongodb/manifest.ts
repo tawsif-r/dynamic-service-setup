@@ -15,6 +15,13 @@ export const mongodb: Component = {
   node: {
     dependencies: { mongoose: "^8.7.0" },
   },
+  // Native driver — ASP.NET wiring registers it as a singleton, no ORM. Pinned to
+  // the 3.x line: 2.x's transitive SharpCompress/Snappier deps carry known CVEs
+  // (NU1902/NU1903) that persist across the whole 2.x line; 3.x's MongoClient/
+  // IMongoClient API this template uses is unchanged from 2.x.
+  dotnet: {
+    packages: { "MongoDB.Driver": "3.11.2" },
+  },
   env: [
     {
       key: "MONGODB_URI",
@@ -41,6 +48,8 @@ export const mongodb: Component = {
     appDependsOn: ["mongodb"],
   },
   readme:
-    "`MONGODB_URI` drives the Mongoose connection. Define schemas with " +
-    "`@nestjs/mongoose` decorators and register them per feature module.",
+    "`MONGODB_URI` is the Mongo connection string. Node backends use Mongoose — " +
+    "define schemas with `@nestjs/mongoose` decorators and register them per feature " +
+    "module. ASP.NET backends get a singleton `IMongoClient` registered in " +
+    "`Program.cs` via the official `MongoDB.Driver`.",
 };

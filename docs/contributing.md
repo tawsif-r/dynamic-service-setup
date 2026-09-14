@@ -161,7 +161,11 @@ gh pr create --base main --fill
 
 - A new tooling component (`editorconfig`, a CI workflow, `husky`/`commitlint` —
   Phase 4 territory).
-- A new database or cache component following the `postgres` / `redis` pattern.
+- A new database or cache component following the `postgres` / `redis` pattern
+  (remember its `dotnet.packages` alongside its `node.dependencies` if it should
+  work with the ASP.NET backends too).
+- A new dotnet backend template (MVC, Blazor, Worker Service, ...) following the
+  `aspnet-minimal` / `aspnet-webapi` pattern.
 - Filling a `readme` section on a component that lacks one.
 - Test coverage for an under-tested merger or edge case.
 - Docs fixes.
@@ -175,8 +179,6 @@ gh pr create --base main --fill
   [adding-a-component.md](adding-a-component.md#when-you-need-an-engine-change)).
 - A new field on `projectConfigSchema`, or any flag rename/removal — preset
   compatibility.
-- The `runtime: "dotnet"` path — it's Phase 3 with a design already sketched in
-  `plan.md`; coordinate so it lands coherently.
 
 **Please don't, in the same PR**
 

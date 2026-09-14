@@ -4,6 +4,9 @@ node_modules/
 # build output
 dist/
 build/
+bin/
+obj/
+*.user
 
 # env & secrets
 .env

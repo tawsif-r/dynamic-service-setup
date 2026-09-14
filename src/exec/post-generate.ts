@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import type { ProjectConfig } from "../config/schema.js";
-import type { Command } from "../components/types.js";
+import type { Command, Runtime } from "../components/types.js";
 import type { Logger } from "../util/logger.js";
 import { getPackageManager } from "./package-manager.js";
 
@@ -10,6 +10,8 @@ export type PostGenerateOptions = {
   /** commands from component `postGenerate` hooks, already ordered */
   commands: Command[];
   logger: Logger;
+  /** the selected backend's runtime — decides the install/format steps below */
+  runtime: Runtime;
   /** print intentions without running anything */
   dryRun?: boolean;
 };
@@ -38,7 +40,9 @@ async function gitInit(projectDir: string, logger: Logger): Promise<void> {
  * individually non-fatal where a failure should not abandon the project.
  */
 export async function runPostGenerate(opts: PostGenerateOptions): Promise<void> {
-  const { projectDir, config, commands, logger, dryRun } = opts;
+  const { projectDir, config, commands, logger, runtime, dryRun } = opts;
+  const isNodeProject = runtime === "node";
+  const isDotnetProject = runtime === "dotnet";
 
   for (const cmd of commands) {
     const cwd = cmd.cwd ?? projectDir;
@@ -47,7 +51,6 @@ export async function runPostGenerate(opts: PostGenerateOptions): Promise<void> 
   }
 
   const pm = getPackageManager(config.packageManager);
-  const isNodeProject = config.backend !== "aspnet"; // refined once dotnet lands
 
   if (config.install && isNodeProject) {
     logger.step(`installing dependencies with ${pm.name}`);
@@ -57,6 +60,18 @@ export async function runPostGenerate(opts: PostGenerateOptions): Promise<void> 
         logger.success("dependencies installed");
       } catch {
         logger.warn(`\`${pm.name} install\` failed — run it yourself in the project directory`);
+      }
+    }
+  }
+
+  if (config.install && isDotnetProject) {
+    logger.step("restoring NuGet packages with dotnet restore");
+    if (!dryRun) {
+      try {
+        await execa("dotnet", ["restore"], { cwd: projectDir, stdio: "inherit" });
+        logger.success("NuGet packages restored");
+      } catch {
+        logger.warn("`dotnet restore` failed — run it yourself in the project directory");
       }
     }
   }

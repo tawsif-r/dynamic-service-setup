@@ -18,6 +18,11 @@ export const postgres: Component = {
       typeorm: "^0.3.20",
     },
   },
+  // Backend-agnostic driver, same spirit as the node deps above — ASP.NET's
+  // built-in DI needs no extra glue package to register a DbContext.
+  dotnet: {
+    packages: { "Npgsql.EntityFrameworkCore.PostgreSQL": "8.0.10" },
+  },
   env: [
     {
       key: "DATABASE_URL",
@@ -52,6 +57,8 @@ export const postgres: Component = {
     appDependsOn: ["postgres"],
   },
   readme:
-    "`DATABASE_URL` drives the TypeORM connection. `synchronize` is enabled outside " +
-    "production; switch to migrations before deploying.",
+    "`DATABASE_URL` is the Postgres connection string. Node backends use TypeORM " +
+    "(`synchronize` is enabled outside production; switch to migrations before " +
+    "deploying). ASP.NET backends use EF Core via `Npgsql.EntityFrameworkCore." +
+    "PostgreSQL`, registered on `AppDbContext` in `Program.cs`.",
 };
